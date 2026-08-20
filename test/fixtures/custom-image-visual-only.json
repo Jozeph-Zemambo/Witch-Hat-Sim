@@ -1,0 +1,20 @@
+{
+  "title": "Custom visual safety",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 90 }],
+      "customImages": [
+        {
+          "name": "Looks like a column sign",
+          "src": "local-user-sketch-column.png",
+          "x": 12,
+          "y": -24,
+          "width": 64,
+          "height": 48,
+          "rotation": 15
+        }
+      ]
+    }
+  ]
+}

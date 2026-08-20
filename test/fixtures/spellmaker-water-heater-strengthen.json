@@ -1,0 +1,52 @@
+{
+  "name": "Water Heater (Strengthened)",
+  "author": "",
+  "description": "Water Heater with sign_Strengthen affixed to the fire sigil modifier source",
+  "seals": [
+    {
+      "name": "Main",
+      "scale": 20,
+      "rings": [{ "weight": 15, "openingSize": 15 }],
+      "sigils": [{ "name": "sigil_Water" }],
+      "signs": [
+        {
+          "name": "sign_Crosshair",
+          "size": 300,
+          "angle": 90,
+          "amount": 2
+        },
+        {
+          "name": "sign_Radial",
+          "size": 300,
+          "angle": 300,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 60
+        },
+        {
+          "name": "sign_Radial",
+          "size": 300,
+          "angle": 60,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 120
+        },
+        {
+          "name": "sigil_Fire",
+          "angle": 180,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 90
+        },
+        {
+          "name": "sign_Strengthen",
+          "size": 300,
+          "angle": 180,
+          "radius": 320,
+          "amount": 1,
+          "rotation": 90
+        }
+      ]
+    }
+  ]
+}

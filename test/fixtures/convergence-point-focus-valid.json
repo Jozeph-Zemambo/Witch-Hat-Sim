@@ -1,0 +1,12 @@
+{
+  "title": "Symmetric inward convergence point-focus (water)",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "convergence", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    }
+  ]
+}

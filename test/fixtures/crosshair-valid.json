@@ -1,0 +1,36 @@
+{
+  "title": "Crosshair valid center-group single ring",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 200 }],
+      "signProfiles": [
+        { "kind": "column", "amount": 2, "radius": 60, "angle": 180 },
+        { "kind": "crosshair", "amount": 1, "radius": 0 }
+      ],
+      "signs": [
+        {
+          "name": "sigil_Fire",
+          "radius": 120,
+          "rotation": 90,
+          "angle": 180,
+          "amount": 1
+        },
+        {
+          "name": "sign_Radial",
+          "amount": 1,
+          "radius": 100,
+          "angle": 300,
+          "rotation": 60
+        },
+        {
+          "name": "sign_Radial",
+          "amount": 1,
+          "radius": 100,
+          "angle": 60,
+          "rotation": 120
+        }
+      ]
+    }
+  ]
+}

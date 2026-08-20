@@ -1,0 +1,10 @@
+{
+  "title": "Radial weak water",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "radial", "amount": 2, "radius": 40, "angle": 0 }]
+    }
+  ]
+}

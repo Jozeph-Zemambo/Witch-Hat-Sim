@@ -1,0 +1,10 @@
+{
+  "seals": [
+    {
+      "rings": [{ "radius": 100 }],
+      "sigils": [{ "name": "water" }],
+      "signProfiles": [{ "kind": "column" }],
+      "lines": []
+    }
+  ]
+}

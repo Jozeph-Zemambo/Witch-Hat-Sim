@@ -1,0 +1,12 @@
+{
+  "title": "Synthetic region inward-only on water",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "region", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 100 }
+      ]
+    }
+  ]
+}

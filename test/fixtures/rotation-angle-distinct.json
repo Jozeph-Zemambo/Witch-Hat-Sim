@@ -1,0 +1,19 @@
+{
+  "title": "Rotation vs angle",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 45,
+          "angle": 30,
+          "radius": 80
+        }
+      ]
+    }
+  ]
+}

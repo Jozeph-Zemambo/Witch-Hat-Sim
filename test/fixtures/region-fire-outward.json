@@ -1,0 +1,12 @@
+{
+  "title": "Synthetic region outward-only on fire",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "region", "amount": 2, "size": 200, "rotation": 0, "angle": 180, "radius": 100 }
+      ]
+    }
+  ]
+}

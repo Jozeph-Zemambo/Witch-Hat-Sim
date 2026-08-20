@@ -1,0 +1,26 @@
+{
+  "title": "Watershot study",
+  "seals": [
+    {
+      "transform": { "x": 10, "y": 20, "scale": 1.5, "rotation": 15, "offsetX": 2, "offsetY": 3 },
+      "rings": [{ "radius": 120, "x": 0, "y": 0 }],
+      "sigils": [{ "name": "water", "x": 0, "y": 0 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 180,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 90
+        }
+      ],
+      "lines": [
+        {
+          "points": [[0, 0], [50, 50]],
+          "from": "sigil:0"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Radial wind no-op",
+  "seals": [
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "radial", "amount": 2, "radius": 40, "angle": 0 }]
+    }
+  ]
+}

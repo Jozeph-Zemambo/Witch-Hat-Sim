@@ -1,0 +1,13 @@
+{
+  "title": "Diagnostics only",
+  "seals": [
+    {
+      "sigils": [{ "name": "unknown_moon" }],
+      "rings": [{ "radius": 80 }],
+      "signProfiles": [
+        { "kind": "rain" },
+        { "kind": "puppet", "amount": 1 }
+      ]
+    }
+  ]
+}

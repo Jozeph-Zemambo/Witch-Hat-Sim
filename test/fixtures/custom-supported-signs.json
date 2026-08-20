@@ -1,0 +1,13 @@
+{
+  "title": "Custom exceptions",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }, { "radius": 200 }],
+      "signProfiles": [
+        { "kind": "crosshair", "amount": 1 },
+        { "kind": "radial", "amount": 1 }
+      ]
+    }
+  ]
+}

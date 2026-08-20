@@ -1,0 +1,47 @@
+{
+  "title": "Synthetic all-outward region multi-domain",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "region",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 180,
+          "radius": 80
+        }
+      ]
+    },
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "region",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 180,
+          "radius": 80
+        }
+      ]
+    },
+    {
+      "sigils": [{ "name": "light" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "region",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 180,
+          "radius": 80
+        }
+      ]
+    }
+  ]
+}

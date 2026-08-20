@@ -1,0 +1,74 @@
+{
+  "name": "Mud Water Earth Mixture",
+  "author": "",
+  "description": "Crosshair heat targets existing water while a second radial earth seal crushes earth; liquid water plus crushed earth can form mud/sludge only when the water source exists.",
+  "seals": [
+    {
+      "name": "Water Material State",
+      "scale": 20,
+      "rings": [
+        {
+          "weight": 15,
+          "openingSize": 15
+        }
+      ],
+      "sigils": [
+        {
+          "name": "sigil_Water"
+        }
+      ],
+      "signs": [
+        {
+          "name": "sign_Crosshair",
+          "size": 300,
+          "angle": 90,
+          "amount": 2
+        },
+        {
+          "name": "sign_Radial",
+          "size": 300,
+          "angle": 300,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 60
+        },
+        {
+          "name": "sign_Radial",
+          "size": 300,
+          "angle": 60,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 120
+        },
+        {
+          "name": "sigil_Fire",
+          "angle": 180,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 90
+        }
+      ]
+    },
+    {
+      "name": "Crushed Earth",
+      "sigils": [
+        {
+          "name": "earth"
+        }
+      ],
+      "rings": [
+        {
+          "radius": 100
+        }
+      ],
+      "signProfiles": [
+        {
+          "kind": "radial",
+          "amount": 2,
+          "radius": 40,
+          "angle": 0
+        }
+      ]
+    }
+  ]
+}

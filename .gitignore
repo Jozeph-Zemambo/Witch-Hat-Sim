@@ -1,0 +1,31 @@
+# Dependencies installed for the root compiler and browser app.
+node_modules/
+**/node_modules/
+
+# Generated browser bundles and test reports.
+dist/
+**/dist/
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+blob-report/
+**/blob-report/
+coverage/
+**/coverage/
+
+# Local tool state and OS/editor noise.
+.DS_Store
+.codex/
+.claude/
+.orchestrator/
+**/.codex/
+**/.claude/
+**/.orchestrator/
+.wrangler/
+*.log
+
+# Local credentials and environment overrides.
+.env
+.env.*
+!.env.example

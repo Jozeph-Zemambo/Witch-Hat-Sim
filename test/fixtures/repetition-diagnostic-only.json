@@ -1,0 +1,19 @@
+{
+  "title": "Synthetic repetition sign on water and fire (no active rules)",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "repetition", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    },
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "repetition", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "title": "Multi-domain directional signs synthetic",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "pull",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 70
+        }
+      ]
+    },
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "region",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 70
+        }
+      ]
+    },
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "dispersion",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 180,
+          "radius": 70
+        }
+      ]
+    }
+  ]
+}

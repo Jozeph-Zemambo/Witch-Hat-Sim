@@ -1,0 +1,25 @@
+{
+  "name": "wha-compiler-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Compiler and simulation workspace for WHA-style magic spells",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./compiler": "./src/compiler/index.js",
+    "./glyphs": "./src/glyphs/lore-glyphs.js",
+    "./simulation-engine": "./src/simulation-engine/index.js",
+    "./mechanics-engine": "./src/mechanics-engine/index.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "compile": "node bin/compile.js",
+    "convert:spell-maker": "node bin/convert-spellmaker.js",
+    "build:app": "npm --prefix app run build",
+    "deploy:cloudflare": "npm run build:app && npx wrangler deploy"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

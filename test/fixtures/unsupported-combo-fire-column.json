@@ -1,0 +1,10 @@
+{
+  "title": "Unsupported fire column",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "column", "amount": 2, "radius": 80 }]
+    }
+  ]
+}

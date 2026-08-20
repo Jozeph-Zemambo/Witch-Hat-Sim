@@ -1,0 +1,44 @@
+{
+  "title": "Water column with radial heat but no crosshair must not warm water",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 200 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 80
+        }
+      ],
+      "signs": [
+        {
+          "name": "sign_Radial",
+          "size": 200,
+          "angle": 300,
+          "radius": 140,
+          "amount": 2,
+          "rotation": 60
+        },
+        {
+          "name": "sign_Radial",
+          "size": 200,
+          "angle": 60,
+          "radius": 140,
+          "amount": 2,
+          "rotation": 120
+        },
+        {
+          "name": "sigil_Fire",
+          "angle": 180,
+          "radius": 140,
+          "amount": 1,
+          "rotation": 90
+        }
+      ]
+    }
+  ]
+}

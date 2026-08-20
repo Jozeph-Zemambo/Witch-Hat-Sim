@@ -1,0 +1,13 @@
+{
+  "title": "Wind inverted column plus convergence (ignored unofficial inference)",
+  "seals": [
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "column", "amount": 2, "size": 200, "rotation": 0, "angle": 180, "radius": 70 },
+        { "kind": "convergence", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    }
+  ]
+}

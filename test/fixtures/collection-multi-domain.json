@@ -1,0 +1,40 @@
+{
+  "title": "Synthetic collection sign on center sigils (all prototype domains)",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "collection", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    },
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "collection", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    },
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "collection", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    },
+    {
+      "sigils": [{ "name": "earth" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "collection", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    },
+    {
+      "sigils": [{ "name": "light" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "collection", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    }
+  ]
+}

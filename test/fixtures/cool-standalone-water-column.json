@@ -1,0 +1,27 @@
+{
+  "title": "Standalone cool on water center column without crosshair",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 80
+        },
+        {
+          "kind": "cool",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 50
+        }
+      ]
+    }
+  ]
+}

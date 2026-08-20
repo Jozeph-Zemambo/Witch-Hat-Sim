@@ -1,0 +1,19 @@
+{
+  "title": "Explicit fire dispersion sign outward path",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "dispersion",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 180,
+          "radius": 80
+        }
+      ]
+    }
+  ]
+}

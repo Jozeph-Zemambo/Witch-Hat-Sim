@@ -1,0 +1,29 @@
+{
+  "title": "Crosshair cool on water center",
+  "seals": [
+    {
+      "sigils": [{ "name": "sigil_Water" }],
+      "rings": [{ "radius": 200 }],
+      "signProfiles": [
+        { "kind": "crosshair", "amount": 1, "radius": 0 }
+      ],
+      "signs": [
+        {
+          "name": "sigil_Earth",
+          "radius": 140,
+          "rotation": 90,
+          "angle": 180,
+          "amount": 1
+        },
+        {
+          "name": "sign_Cool",
+          "size": 250,
+          "radius": 140,
+          "rotation": 90,
+          "angle": 180,
+          "amount": 1
+        }
+      ]
+    }
+  ]
+}

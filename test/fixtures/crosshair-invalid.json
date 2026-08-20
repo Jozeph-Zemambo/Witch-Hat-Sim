@@ -1,0 +1,13 @@
+{
+  "title": "Crosshair invalid structure",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 80 }, { "radius": 160 }],
+      "signProfiles": [
+        { "kind": "crosshair", "amount": 1, "radius": 100 },
+        { "kind": "radial", "amount": 1, "radius": 120 }
+      ]
+    }
+  ]
+}

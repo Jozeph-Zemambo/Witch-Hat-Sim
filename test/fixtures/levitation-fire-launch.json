@@ -1,0 +1,13 @@
+{
+  "title": "Fire levitation imbalanced launch",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "levitation", "amount": 1, "radius": 60, "angle": 180, "size": 300 },
+        { "kind": "levitation", "amount": 1, "radius": 60, "angle": 90, "size": 120 }
+      ]
+    }
+  ]
+}

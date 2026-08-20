@@ -1,0 +1,25 @@
+{
+  "title": "Synthetic safety-gated official catalog signs",
+  "seals": [
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "Sign of Wind", "amount": 1, "size": 200, "radius": 70 }]
+    },
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "aeriforms_defined", "amount": 1, "size": 200, "radius": 70 }]
+    },
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "glaives", "amount": 1, "size": 200, "radius": 70 }]
+    },
+    {
+      "sigils": [{ "name": "light" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "sights_set", "amount": 1, "size": 200, "radius": 70 }]
+    }
+  ]
+}

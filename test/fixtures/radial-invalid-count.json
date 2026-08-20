@@ -1,0 +1,10 @@
+{
+  "title": "Radial invalid point-at count",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "radial", "amount": 1, "radius": 40, "angle": 0 }]
+    }
+  ]
+}

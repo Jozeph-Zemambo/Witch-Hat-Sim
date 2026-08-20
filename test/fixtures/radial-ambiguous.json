@@ -1,0 +1,10 @@
+{
+  "title": "Radial ambiguous domains",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }, { "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "radial", "amount": 1, "radius": 40 }]
+    }
+  ]
+}

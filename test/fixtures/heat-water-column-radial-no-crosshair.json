@@ -1,0 +1,44 @@
+{
+  "title": "Water column with off-center fire radial heat, no crosshair",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 200 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 80
+        }
+      ],
+      "signs": [
+        {
+          "name": "sigil_Fire",
+          "angle": 180,
+          "radius": 320,
+          "amount": 1,
+          "rotation": 90
+        },
+        {
+          "name": "sign_Radial",
+          "size": 300,
+          "angle": 300,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 60
+        },
+        {
+          "name": "sign_Radial",
+          "size": 300,
+          "angle": 60,
+          "radius": 320,
+          "amount": 2,
+          "rotation": 120
+        }
+      ]
+    }
+  ]
+}

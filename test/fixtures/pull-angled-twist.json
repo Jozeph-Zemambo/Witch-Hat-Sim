@@ -1,0 +1,12 @@
+{
+  "title": "Angled pull with tangential twist metadata",
+  "seals": [
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "pull", "amount": 2, "size": 200, "rotation": 45, "angle": 45, "radius": 80 }
+      ]
+    }
+  ]
+}

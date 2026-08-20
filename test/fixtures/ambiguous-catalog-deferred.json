@@ -1,0 +1,20 @@
+{
+  "title": "Synthetic deferred official catalog signs",
+  "seals": [
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "billow", "amount": 1, "size": 200, "radius": 70 }]
+    },
+    {
+      "sigils": [{ "name": "earth" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "weave", "amount": 1, "size": 200, "radius": 70 }]
+    },
+    {
+      "sigils": [{ "name": "light" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "entwine", "amount": 1, "size": 200, "radius": 70 }]
+    }
+  ]
+}

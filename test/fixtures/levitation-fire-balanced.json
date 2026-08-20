@@ -1,0 +1,12 @@
+{
+  "title": "Fire levitation balanced float",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "levitation", "amount": 2, "radius": 50, "angle": 180, "size": 240 }
+      ]
+    }
+  ]
+}

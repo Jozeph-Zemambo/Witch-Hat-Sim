@@ -1,0 +1,12 @@
+{
+  "title": "Inverted outward-facing pull push semantics",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "pull", "amount": 2, "size": 200, "rotation": 0, "angle": 180, "radius": 80 }
+      ]
+    }
+  ]
+}

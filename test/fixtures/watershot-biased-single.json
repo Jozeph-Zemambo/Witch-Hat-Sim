@@ -1,0 +1,19 @@
+{
+  "title": "Single biased Watershot column",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 1,
+          "size": 320,
+          "rotation": 90,
+          "angle": 0,
+          "radius": 80
+        }
+      ]
+    }
+  ]
+}

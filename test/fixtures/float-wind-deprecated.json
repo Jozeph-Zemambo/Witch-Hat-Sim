@@ -1,0 +1,12 @@
+{
+  "title": "Synthetic wind sigil with deprecated sign_Float",
+  "seals": [
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "float", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    }
+  ]
+}

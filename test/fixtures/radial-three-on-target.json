@@ -1,0 +1,10 @@
+{
+  "title": "Radial invalid count three on target",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [{ "kind": "radial", "amount": 3, "radius": 40, "angle": 0 }]
+    }
+  ]
+}

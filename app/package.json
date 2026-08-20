@@ -1,0 +1,26 @@
+{
+  "name": "wha-simulator-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "playwright test",
+    "test:mechanics": "node --test mechanics-tests/*.test.js"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.18.2",
+    "@react-three/fiber": "^9.6.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "three": "^0.184.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.14"
+  }
+}

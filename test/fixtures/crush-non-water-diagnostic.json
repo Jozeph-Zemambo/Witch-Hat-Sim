@@ -1,0 +1,71 @@
+{
+  "title": "Non-water crush domains diagnostic only",
+  "seals": [
+    {
+      "sigils": [{ "name": "fire" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 80
+        },
+        {
+          "kind": "crush",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 60
+        }
+      ]
+    },
+    {
+      "sigils": [{ "name": "wind" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 80
+        },
+        {
+          "kind": "crush",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 60
+        }
+      ]
+    },
+    {
+      "sigils": [{ "name": "light" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 80
+        },
+        {
+          "kind": "crush",
+          "amount": 2,
+          "size": 200,
+          "rotation": 0,
+          "angle": 0,
+          "radius": 60
+        }
+      ]
+    }
+  ]
+}

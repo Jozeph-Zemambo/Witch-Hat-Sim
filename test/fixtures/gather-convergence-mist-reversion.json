@@ -1,0 +1,13 @@
+{
+  "title": "Gather converged mist reversion",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        { "kind": "gather", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 },
+        { "kind": "convergence", "amount": 2, "size": 200, "rotation": 0, "angle": 0, "radius": 70 }
+      ]
+    }
+  ]
+}

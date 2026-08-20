@@ -1,0 +1,19 @@
+{
+  "title": "Outward inverted water column dispersion path",
+  "seals": [
+    {
+      "sigils": [{ "name": "water" }],
+      "rings": [{ "radius": 100 }],
+      "signProfiles": [
+        {
+          "kind": "column",
+          "amount": 4,
+          "size": 200,
+          "rotation": 0,
+          "angle": 180,
+          "radius": 80
+        }
+      ]
+    }
+  ]
+}
