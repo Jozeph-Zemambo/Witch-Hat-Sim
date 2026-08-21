@@ -139,6 +139,11 @@ test('FP mouse yaw and pitch are natural, bounded, W-stable, and diagonal moveme
   await cameraModeToggle.hover();
   await expect(page.getByTestId('camera-mode-tooltip')).toHaveText('First person');
   await expect(page.getByTestId('camera-mode-tooltip')).toBeVisible();
+  const hudLayering = await page.evaluate(() => ({
+    camera: Number.parseInt(getComputedStyle(document.querySelector('.scene-overlay-controls')).zIndex, 10),
+    audio: Number.parseInt(getComputedStyle(document.querySelector('.hud-audio-settings')).zIndex, 10),
+  }));
+  expect(hudLayering.camera).toBeGreaterThan(hudLayering.audio);
   await expect(page.getByTestId('fps-crosshair')).toBeVisible();
   await installPointerLockProbe(page);
   await page.getByTestId('camera-pointer-lock').click();

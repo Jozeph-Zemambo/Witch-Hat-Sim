@@ -111,6 +111,15 @@ export function evaluateMountedSpellDevices(document, snapshot, options = {}) {
     });
     runtimes[device.deviceId] = runtime;
     const active = runtime.lifecycle?.active === true;
+    const stoppingEffectIds = new Set(
+      runtime.intents
+        .filter(
+          (intent) =>
+            intent.intentType === 'effect_lifecycle' &&
+            intent.operation === 'stop',
+        )
+        .map((intent) => intent.sourceIntentId),
+    );
     const outputIntents = runtime.intents.filter(
       (intent) =>
         [
@@ -124,7 +133,13 @@ export function evaluateMountedSpellDevices(document, snapshot, options = {}) {
         ].includes(
           intent.intentType,
         ),
-    );
+    ).map((intent) => ({
+      ...intent,
+      // Keep a render consumer alive when the simulation explicitly asks the
+      // effect to stop. Renderers with an ending phase can then stop emission
+      // and finish the material already in flight instead of being unmounted.
+      deactivating: stoppingEffectIds.has(intent.id),
+    }));
     devices.push({
       deviceId: device.deviceId,
       assemblyId: device.assemblyId,
@@ -213,16 +228,20 @@ export function worldFrameForDevice(device, assemblyTransform) {
     z: tangent.z - normal.z * tangentAlongNormal,
   });
   const bitangent = normalizeVector(crossVector(normal, tangent));
+  const plateScale = Math.max(
+    0.05,
+    Number(device.plateRadius ?? 0.42) / 0.42,
+  );
   return {
     origin: transformPoint(transform, device.localFrame.origin),
     normal,
     tangent,
     bitangent,
-    // Library placements bake their spatial scale into the runtime mechanics
-    // document. Carry that same scale into the compiler placement frame so a
-    // mounted spell's emitted geometry does not stay full-sized on a reduced
-    // machine (or undersized on an enlarged one).
-    worldScale: 0.55 * Math.max(0.05, Number(device.placementScale ?? 1)),
+    // The physical spell plate is the circle's scale authority. Workbench
+    // plate edits and main-world assembly placement both bake their size into
+    // plateRadius, so every mounted output follows the same visible owner
+    // without multiplying outer and inner assembly scale twice.
+    worldScale: 0.55 * plateScale,
     placementMode: 'mounted_surface',
     surfaceMode: 'mechanical_spell_plate',
     surfaceTargetId: device.assemblyId,

@@ -60,7 +60,9 @@ async function openWorkshopSpellMaker(page) {
   await toolbar.getByRole('button', { name: 'Spell plate', exact: true }).click();
   const mountDialog = page.getByRole('dialog', { name: 'Mount a spell plate' });
   await mountDialog.getByRole('button', { name: 'Create a spell for this plate' }).click();
-  return page.getByRole('dialog', { name: 'Create spell for plate' });
+  const maker = page.getByRole('dialog', { name: 'Create spell for plate' });
+  await expect(maker).toBeVisible();
+  return maker;
 }
 
 test('assembly editor visibility controls persist, identify click-through items, and undo independently', async ({ page }) => {
@@ -688,15 +690,16 @@ test('workbench spell maker selects a core sigil when its artwork is clicked', a
   const maker = await openWorkshopSpellMaker(page);
   const fireRadio = maker.getByRole('radio', { name: 'Fire' });
   const fireArtwork = maker.locator('svg[data-glyph-id="sigil.fire"]');
+  const fireCard = fireRadio.locator('..');
 
   await expect(fireRadio).not.toBeChecked();
   await expect(fireArtwork).toBeVisible();
-  const artworkBox = await fireArtwork.boundingBox();
-  if (!artworkBox) throw new Error('Fire sigil artwork has no bounding box.');
+  const cardBox = await fireCard.boundingBox();
+  if (!cardBox) throw new Error('Fire sigil card has no bounding box.');
   // Click the visible artwork coordinates rather than the text or radio. The
   // glyph itself is intentionally pointer-transparent so Safari resolves the
   // hit on the enclosing label.
-  await page.mouse.click(artworkBox.x + artworkBox.width / 2, artworkBox.y + artworkBox.height / 2);
+  await page.mouse.click(cardBox.x + cardBox.width / 2, cardBox.y + 7 + 24);
   await expect(fireRadio).toBeChecked();
 });
 
@@ -886,6 +889,23 @@ test('one camshaft sequences three independently mounted water spell gates', asy
         ?.some((intent) => intent.intentType === 'water_column' && intent.materialKind === 'water')
       ?? false
     )))
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => {
+      const ending = Object.entries(window.__WHA_MAIN_WATER_COLUMNS__ ?? {}).find(([, column]) => (
+        column.lifecycle?.phase === 'ending' &&
+        column.lifecycle.back > 0 &&
+        column.lifecycle.front > column.lifecycle.back
+      ));
+      if (ending) window.__WHA_CAM_WATER_ENDING_ID__ = ending[0];
+      return Boolean(ending);
+    }))
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => {
+      const endingId = window.__WHA_CAM_WATER_ENDING_ID__;
+      return Boolean(endingId) && !(endingId in (window.__WHA_MAIN_WATER_COLUMNS__ ?? {}));
+    }))
     .toBe(true);
 });
 

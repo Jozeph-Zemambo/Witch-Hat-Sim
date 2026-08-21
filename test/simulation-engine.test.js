@@ -15,6 +15,7 @@ import {
   createSceneSource,
   interpretCompiledSpell,
   DISPERSION_NOTE_CLEARANCE_FACTOR,
+  MIN_MOUNTED_SPELL_WORLD_SCALE,
   NORMALIZED_PLACED_SPELL_NOTE_SIDE,
   NORMALIZED_SPELL_CIRCLE_RADIUS,
   placedSpellDispersionClearanceRadius,
@@ -3900,6 +3901,102 @@ test('placed spell world scale changes linear geometry and cubic generated volum
   assert.equal(doubledColumn.resourceBudget.columnHeight, baseColumn.resourceBudget.columnHeight * 2);
   assert.equal(doubledColumn.resourceBudget.amount, baseColumn.resourceBudget.amount * 8);
   assert.equal(doubledColumn.resourceBudget.placementScalePolicy, 'linear_world_geometry_cubic_generated_volume');
+});
+
+test('tiny mounted spell columns preserve assembly scale below the ordinary world-note floor', () => {
+  const mountedScale = 0.055;
+  const fullMountedScale = 0.55;
+  const ratio = mountedScale / fullMountedScale;
+  const interpretColumn = (materialKind, worldScale) => {
+    const compiled = compileSpell({
+      title: `${materialKind} mounted scale contract`,
+      seals: [{
+        sigils: [{ name: materialKind }],
+        rings: [{ radius: 100 }],
+        signProfiles: [{ kind: 'column', amount: 4, size: 200, radius: 80 }],
+      }],
+    });
+    return interpretCompiledSpell({
+      graph: compiled.graph,
+      program: compiled.program,
+      diagnostics: compiled.diagnostics,
+      sceneState: { sources: [], props: [] },
+      options: {
+        placementFrame: {
+          origin: { x: 0, y: 0, z: 0 },
+          normal: { x: 0, y: 1, z: 0 },
+          tangent: { x: 1, y: 0, z: 0 },
+          worldScale,
+          placementMode: 'mounted_surface',
+          surfaceMode: 'mechanical_spell_plate',
+        },
+      },
+    });
+  };
+
+  for (const materialKind of ['water', 'fire', 'earth', 'wind', 'light']) {
+    const tiny = interpretColumn(materialKind, mountedScale);
+    const full = interpretColumn(materialKind, fullMountedScale);
+    const tinyFrame = intentsOf(tiny, 'placement_frame')[0];
+    const tinyColumn = tiny.intents.find((intent) =>
+      ['water_column', 'material_column'].includes(intent.intentType),
+    );
+    const fullColumn = full.intents.find((intent) =>
+      ['water_column', 'material_column'].includes(intent.intentType),
+    );
+
+    assert.equal(tinyFrame.worldScale, mountedScale, materialKind);
+    assert.ok(tinyFrame.worldScale > MIN_MOUNTED_SPELL_WORLD_SCALE, materialKind);
+    assert.equal(tinyColumn.worldScale, mountedScale, materialKind);
+    assert.equal(
+      tinyColumn.physicsField.length,
+      Number((fullColumn.physicsField.length * ratio).toFixed(4)),
+      `${materialKind} column length follows its assembly`,
+    );
+    assert.equal(
+      tinyColumn.physicsField.radius,
+      Number((fullColumn.physicsField.radius * ratio).toFixed(4)),
+      `${materialKind} column radius follows its assembly`,
+    );
+    assert.equal(
+      tinyColumn.resourceBudget.amount,
+      Number((fullColumn.resourceBudget.amount * ratio ** 3).toFixed(4)),
+      `${materialKind} generated volume follows cubic assembly scale`,
+    );
+
+    if (materialKind === 'light') {
+      const illumination = intentsOf(tiny, 'illumination')[0];
+      assert.equal(
+        illumination.glowRadius,
+        Number((NORMALIZED_SPELL_CIRCLE_RADIUS * mountedScale * 1.15).toFixed(4)),
+      );
+      assert.equal(
+        illumination.glowRadiusPolicy,
+        'one_point_one_five_times_owning_spell_circle_radius',
+      );
+    }
+  }
+});
+
+test('ordinary world spell placements preserve deliberate miniaturization', () => {
+  const compiled = compileFixture('watershot-centered.json');
+  const tinyResult = interpretCompiledSpell({
+    graph: compiled.graph,
+    program: compiled.program,
+    diagnostics: compiled.diagnostics,
+    sceneState: { sources: [], props: [] },
+    options: { placementFrame: { worldScale: 0.055 } },
+  });
+  const belowSafetyFloor = interpretCompiledSpell({
+    graph: compiled.graph,
+    program: compiled.program,
+    diagnostics: compiled.diagnostics,
+    sceneState: { sources: [], props: [] },
+    options: { placementFrame: { worldScale: 0.01 } },
+  });
+
+  assert.equal(intentsOf(tinyResult, 'placement_frame')[0].worldScale, 0.055);
+  assert.equal(intentsOf(belowSafetyFloor, 'placement_frame')[0].worldScale, 0.05);
 });
 
 test('default timed activation lasts five seconds and placement scale is clamped', () => {

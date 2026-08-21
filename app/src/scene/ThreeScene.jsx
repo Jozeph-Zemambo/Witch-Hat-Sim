@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import {
   emphasizeUniformScaleHandle,
+  installDirectionalUniformScale,
   installTransformAxisLatch,
 } from '../mechanics/transformControlInteraction.js';
 import {
@@ -60,6 +61,7 @@ import {
 import { LIGHT_MAGIC } from '../visual/lightMagic.js';
 import { YardDetails, YardGroundCover } from './YardGroundCover.jsx';
 import {
+  MIN_MOUNTED_SPELL_WORLD_SCALE,
   NORMALIZED_PLACED_SPELL_NOTE_SIDE,
   NORMALIZED_SPELL_CIRCLE_RADIUS,
   placedSpellDispersionClearanceRadius,
@@ -68,13 +70,51 @@ import {
   DEFAULT_PLACED_SPELL_SCALE,
   MIN_PLACED_SPELL_SCALE,
 } from '../store.js';
-
-const DEFAULT_FRAME = {
-  origin: { x: 0, y: 0, z: 0 },
-  normal: { x: 0, y: 1, z: 0 },
-  tangent: { x: 1, y: 0, z: 0 },
-  bitangent: { x: 0, y: 0, z: 1 },
-};
+import {
+  createWaterColumnSurfaceGeometry,
+  updateWaterColumnSurfaceGeometry,
+  createIrregularPoolGeometry,
+  updateIrregularPoolGeometry,
+  updateSurfaceStreaks,
+  updateTopSpray,
+  updateContactSpray,
+  updateParticles,
+  waterDebug,
+  solveWaterColumnContacts,
+  classifyWaterColumnPropContact,
+  propContactBounds,
+  propContactSamples,
+  waterSurfaceCenter,
+  waterSurfaceRadius,
+  waterParticleProfiles,
+  simulateWaterParticle,
+  lobeProfile,
+  seededProfileRandom,
+  hashStringToUnit,
+} from './waterColumnSimulation.js';
+import {
+  DEFAULT_FRAME,
+  anchorForPolarAngle,
+  centeredDispersionOrigin,
+  clamp,
+  easeOutCubic,
+  environmentPalette,
+  horizontalBasis,
+  lookDirectionFor,
+  mapAxis,
+  normalizeFrame,
+  perpendicularBasis,
+  quaternionFromFrame,
+  quaternionFromUp,
+  round,
+  safeMeshId,
+  symbolPosition,
+  toSceneAxis,
+  toVector3,
+  vectorArray,
+  vectorDebug,
+  worldThicknessRadiusForIntent,
+} from './sceneMath.js';
 
 const PLAYER_HEIGHT = 1.575;
 // First-person eye height must clear the 1.22 m atelier desktops so the
@@ -331,6 +371,7 @@ function WorldWrenchTransformGizmo({ placement, mode, onCommit, onDragStateChang
     controls.setScaleSnap(0.1);
     controls.setSize(0.78);
     emphasizeUniformScaleHandle(controls);
+    const removeDirectionalUniformScale = installDirectionalUniformScale(controls, gl.domElement);
     controls.attach(object);
     const helper = controls.getHelper();
     helper.name = `wrench-transform-controls:${placement.kind}:${placement.id}`;
@@ -372,6 +413,7 @@ function WorldWrenchTransformGizmo({ placement, mode, onCommit, onDragStateChang
     return () => {
       if (controls.dragging) onDragStateChangeRef.current?.(false);
       removeAxisLatch();
+      removeDirectionalUniformScale();
       controls.removeEventListener('change', syncFeedback);
       controls.removeEventListener('dragging-changed', handleDragging);
       controls.removeEventListener('mouseUp', handleMouseUp);
@@ -2664,8 +2706,9 @@ export function SimSpellOutputPresentation({
   timelinePaused = false,
   props = [],
 }) {
-  const intents = devices.flatMap((device) => (device.outputIntents ?? [])
-    .filter((intent) => intent.active === true)
+  const previousActiveIntentIdsRef = useRef(new Set());
+  const [endingIntentIds, setEndingIntentIds] = useState(() => new Set());
+  const describedIntents = devices.flatMap((device) => (device.outputIntents ?? [])
     .map((intent) => ({
       ...intent,
       _runtimeIntentId: intent.id,
@@ -2675,6 +2718,48 @@ export function SimSpellOutputPresentation({
       _worldScale: Number(intent.worldScale ?? device.frame?.worldScale ?? 1),
       _effectScale: Number(intent.worldScale ?? device.frame?.worldScale ?? 1),
     })));
+  const currentIntentIds = new Set(describedIntents.map((intent) => intent.id));
+  const activeIntentIds = new Set(
+    describedIntents.filter((intent) => intent.active === true).map((intent) => intent.id),
+  );
+  const newlyEndingIntentIds = new Set(
+    describedIntents
+      .filter(
+        (intent) =>
+          intent.active !== true &&
+          intent.deactivating === true &&
+          previousActiveIntentIdsRef.current.has(intent.id) &&
+          mountedIntentHasEndingAnimation(intent),
+      )
+      .map((intent) => intent.id),
+  );
+  const intents = describedIntents.filter(
+    (intent) =>
+      intent.active === true ||
+      endingIntentIds.has(intent.id) ||
+      newlyEndingIntentIds.has(intent.id),
+  );
+  useEffect(() => {
+    setEndingIntentIds((current) => {
+      const next = new Set(
+        [...current].filter(
+          (id) => currentIntentIds.has(id) && !activeIntentIds.has(id),
+        ),
+      );
+      for (const id of newlyEndingIntentIds) next.add(id);
+      if (next.size === current.size && [...next].every((id) => current.has(id))) return current;
+      return next;
+    });
+    previousActiveIntentIdsRef.current = activeIntentIds;
+  }, [devices]);
+  const handleIntentSettled = useCallback((intentId) => {
+    setEndingIntentIds((current) => {
+      if (!current.has(intentId)) return current;
+      const next = new Set(current);
+      next.delete(intentId);
+      return next;
+    });
+  }, []);
   const waterColumns = intents.filter((intent) => intent.intentType === 'water_column');
   const materialColumns = intents.filter((intent) => intent.intentType === 'material_column');
   const dispersions = intents.filter(
@@ -2688,7 +2773,8 @@ export function SimSpellOutputPresentation({
     simSpellOutputRegistry.set(owner, {
       owner,
       deviceCount: devices.length,
-      activeIntentCount: intents.length,
+      activeIntentCount: intents.filter((intent) => intent.active === true).length,
+      renderIntentCount: intents.length,
       intents: intents.map((intent) => ({
         id: intent.id,
         intentType: intent.intentType,
@@ -2707,25 +2793,55 @@ export function SimSpellOutputPresentation({
       {illuminations.length > 0 ? (
         <SpellIlluminationPresentation owner={owner} illuminations={illuminations} />
       ) : null}
-      {levitations.length > 0 ? <LevitationPresentation intents={levitations} /> : null}
+      {levitations.length > 0 ? (
+        <LevitationPresentation
+          intents={levitations}
+          onIntentSettled={handleIntentSettled}
+        />
+      ) : null}
       {waterColumns.length > 0 ? (
         <WaterColumns
           intents={waterColumns}
           lifecycle={null}
           timelinePaused={timelinePaused}
           props={props}
+          onIntentSettled={handleIntentSettled}
         />
       ) : null}
       {materialColumns.length > 0 ? (
-        <MaterialColumns intents={materialColumns} blockedEarthVisualSpellIds={new Set()} props={props} />
+        <MaterialColumns
+          intents={materialColumns}
+          blockedEarthVisualSpellIds={new Set()}
+          props={props}
+          onIntentSettled={handleIntentSettled}
+        />
       ) : null}
       {dispersions.some((intent) => intent.materialKind === 'water') ? (
-        <WaterDispersions intents={dispersions.filter((intent) => intent.materialKind === 'water')} />
+        <WaterDispersions
+          intents={dispersions.filter((intent) => intent.materialKind === 'water')}
+          onIntentSettled={handleIntentSettled}
+        />
       ) : null}
       {dispersions.some((intent) => intent.materialKind !== 'water') ? (
-        <MaterialDispersions intents={dispersions.filter((intent) => intent.materialKind !== 'water')} />
+        <MaterialDispersions
+          intents={dispersions.filter((intent) => intent.materialKind !== 'water')}
+          onIntentSettled={handleIntentSettled}
+        />
       ) : null}
     </group>
+  );
+}
+
+function mountedIntentHasEndingAnimation(intent) {
+  if (intent.intentType === 'water_column') {
+    return !['mist_cloud', 'ice_chunk'].includes(intent.renderPreset);
+  }
+  if (intent.intentType === 'material_column') return true;
+  if (['water_dispersion', 'material_dispersion'].includes(intent.intentType)) return true;
+  return (
+    intent.intentType === 'force_constraint_debug' &&
+    intent.registryId === 'sign.levitation' &&
+    intent.materialKind !== 'wind'
   );
 }
 
@@ -2772,7 +2888,7 @@ function SpellCircle({
   const frame = normalizeFrame(circle.placementFrame);
   const worldScale = clamp(
     Number(circle.placementFrame?.worldScale ?? spell.transform?.scale ?? MIN_PLACED_SPELL_SCALE),
-    MIN_PLACED_SPELL_SCALE,
+    MIN_MOUNTED_SPELL_WORLD_SCALE,
     4,
   );
   const maxRadius = Math.max(
@@ -3193,7 +3309,7 @@ function Prop({ prop, selectedTool, selected, onAssetSelect, onPrimaryToolAction
   );
 }
 
-function WaterColumns({ intents, lifecycle, timelinePaused, props }) {
+function WaterColumns({ intents, lifecycle, timelinePaused, props, onIntentSettled }) {
   const physicsInterceptions = usePhysicsColumnInterceptions(intents);
   const collisionBoxes = useMemo(
     () => (props ?? [])
@@ -3223,7 +3339,7 @@ function WaterColumns({ intents, lifecycle, timelinePaused, props }) {
         const dir = intent.sceneAxis ? toSceneAxis(intent.sceneAxis) : mapAxis(intent.axis);
         const placedWorldScale = clamp(
           Number(intent._worldScale ?? MIN_PLACED_SPELL_SCALE),
-          MIN_PLACED_SPELL_SCALE,
+          MIN_MOUNTED_SPELL_WORLD_SCALE,
           4,
         );
         const worldThicknessRingRadius = worldThicknessRadiusForIntent(intent);
@@ -3235,7 +3351,9 @@ function WaterColumns({ intents, lifecycle, timelinePaused, props }) {
             Math.max(0.9, intent.magnitude * 0.34 * Math.max(0.35, intent.signSizeScale ?? 1) + 0.78),
           ) * (intent.columnHeightMultiplier ?? 3) * placedWorldScale
         ));
-        const radius = Math.max(0.08, worldThicknessRingRadius * (intent.columnRadiusRatio ?? 0.7)) * placedWorldScale;
+        const radius = Number(intent.physicsField?.radius ?? (
+          Math.max(0.08, worldThicknessRingRadius * (intent.columnRadiusRatio ?? 0.7)) * placedWorldScale
+        ));
         return columnRenderPlans(intent, { x: 0, y: 0.22, z: 0 }).map((plan) => {
           const planRadius = radius * plan.radiusScale;
           const key = `${intent.id}${plan.nameSuffix}`;
@@ -3266,6 +3384,7 @@ function WaterColumns({ intents, lifecycle, timelinePaused, props }) {
                   ...(physicsInterceptions[intent.id] ? [physicsInterceptions[intent.id]] : []),
                 ]}
                 active={intent.active === true}
+                onLifecycleSettled={() => onIntentSettled?.(intent.id)}
                 showLabContext={false}
                 settings={{
                   ...WATER_COLUMN_RUNTIME_SETTINGS,
@@ -3333,7 +3452,15 @@ export function SpellIlluminationPresentation({ owner = 'scene', illuminations =
 function SpellIlluminationEmitter({ entry }) {
   const { scene } = useThree();
   const origin = entry.emitterOrigin ?? entry.origin ?? { x: 0, y: 0, z: 0 };
-  const reach = clamp(Number(entry.reach ?? 1), 0.7, ILLUMINATION_MAX_REACH);
+  const reach = clamp(Number(entry.reach ?? 1), 0.01, ILLUMINATION_MAX_REACH);
+  const glowRadius = clamp(
+    Number(
+      entry.glowRadius ??
+      NORMALIZED_SPELL_CIRCLE_RADIUS * Number(entry.worldScale ?? 1) * 1.15
+    ),
+    0.01,
+    ILLUMINATION_MAX_REACH,
+  );
   // Rendered candela: the intent's abstract intensity is tuned for the
   // debug falloff model; three's physical point lights need more punch
   // for the glow to read against a lit scene.
@@ -3443,7 +3570,7 @@ function SpellIlluminationEmitter({ entry }) {
           position={[origin.x ?? 0, origin.y ?? 0, origin.z ?? 0]}
           renderOrder={3}
         >
-          <sphereGeometry args={[reach * shellRadius, 24, 18]} />
+          <sphereGeometry args={[glowRadius * shellRadius, 24, 18]} />
           <meshBasicMaterial
             color={entry.color ?? LIGHT_MAGIC.illumination}
             transparent
@@ -3577,12 +3704,13 @@ function clusterEscapeSamples(samples, maxClusters = 3) {
 
 const ILLUMINATION_MAX_REACH = 9;
 const ILLUMINATION_MAX_INTENSITY = 2.6;
-// [fraction of reach, base opacity] per additive shell: a bright core with two
-// wider, fainter halos fakes the falloff of light scattering in air.
+// [fraction of the spell-circle-derived glow radius, base opacity] per
+// additive shell: a bright core with two wider, fainter halos fakes in-air
+// scattering without tying the visible orb to the much longer cast-light reach.
 const ILLUMINATION_GLOW_SHELLS = [
-  [0.12, 0.5],
-  [0.3, 0.22],
-  [0.62, 0.09],
+  [0.38, 0.5],
+  [0.72, 0.22],
+  [1, 0.09],
 ];
 
 // Where the emitter's beam first lands, roughly: half the reach along the
@@ -3601,7 +3729,15 @@ function illuminationBounceOrigin(entry, origin, reach) {
 
 function illuminationDebugEntry(entry, owner) {
   const origin = entry.emitterOrigin ?? entry.origin ?? { x: 0, y: 0, z: 0 };
-  const reach = clamp(Number(entry.reach ?? 1), 0.7, ILLUMINATION_MAX_REACH);
+  const reach = clamp(Number(entry.reach ?? 1), 0.01, ILLUMINATION_MAX_REACH);
+  const glowRadius = clamp(
+    Number(
+      entry.glowRadius ??
+      NORMALIZED_SPELL_CIRCLE_RADIUS * Number(entry.worldScale ?? 1) * 1.15
+    ),
+    0.01,
+    ILLUMINATION_MAX_REACH,
+  );
   const intensity = clamp(Number(entry.intensity ?? 0), 0, ILLUMINATION_MAX_INTENSITY);
   const falloff = (distance) => round(intensity / (1 + (distance / reach) ** 2));
   return {
@@ -3615,6 +3751,7 @@ function illuminationDebugEntry(entry, owner) {
     direction: vectorDebug(entry.direction),
     radius: round(Number(entry.radius ?? 0)),
     reach: round(reach),
+    glowRadius: round(glowRadius),
     color: entry.color ?? LIGHT_MAGIC.illumination,
     intensity: round(intensity),
     worldScale: round(Number(entry.worldScale ?? 1)),
@@ -3672,7 +3809,7 @@ function updateLevitationVisual(intent, patch) {
   publishLevitationVisuals();
 }
 
-function LevitationPresentation({ intents = [] }) {
+function LevitationPresentation({ intents = [], onIntentSettled }) {
   const ownedIdsRef = useRef(new Set());
   useEffect(() => {
     const ids = new Set(intents.map((intent) => intent.id));
@@ -3700,7 +3837,13 @@ function LevitationPresentation({ intents = [] }) {
       {intents.map((intent) => (
         intent.materialKind === 'wind'
           ? <WindLevitationStream key={intent.id} intent={intent} />
-          : <ElementalLevitationOrb key={intent.id} intent={intent} />
+          : (
+            <ElementalLevitationOrb
+              key={intent.id}
+              intent={intent}
+              onLifecycleSettled={() => onIntentSettled?.(intent.id)}
+            />
+          )
       ))}
     </group>
   );
@@ -3722,7 +3865,7 @@ function levitationRenderName(intent) {
   return `levitation-orb:main-world-field:${intent.placedSpellId}:${intent._runtimeIntentId}`;
 }
 
-function ElementalLevitationOrb({ intent }) {
+function ElementalLevitationOrb({ intent, onLifecycleSettled }) {
   const circleRadius = NORMALIZED_SPELL_CIRCLE_RADIUS * Number(
     intent._worldScale ?? DEFAULT_PLACED_SPELL_SCALE,
   );
@@ -3748,6 +3891,7 @@ function ElementalLevitationOrb({ intent }) {
   const particleRefs = useRef([]);
   const reducedMotionRef = useRef(false);
   const motionRef = useRef(createLevitationOrbMotionState());
+  const settledNotifiedRef = useRef(intent.active !== true);
   const hoverHeight = Number(intent.physicsField?.hoverHeight ?? 0.7);
 
   useEffect(() => () => {
@@ -3797,6 +3941,7 @@ function ElementalLevitationOrb({ intent }) {
     if (!root || !core) return;
     const motion = motionRef.current;
     const active = intent.active === true;
+    if (active) settledNotifiedRef.current = false;
     const reduced = reducedMotionRef.current;
     const dt = Math.min(1 / 30, Math.max(0, rawDt));
     if (motion.active !== active) {
@@ -3836,6 +3981,10 @@ function ElementalLevitationOrb({ intent }) {
         light: lightRef.current,
         particles: particleRefs.current,
       });
+      if (motion.settled && !settledNotifiedRef.current) {
+        settledNotifiedRef.current = true;
+        onLifecycleSettled?.();
+      }
     }
     animateLevitationOrbVisual({
       domain: visualDomain,
@@ -4250,7 +4399,7 @@ function publishIlluminationDebug() {
   };
 }
 
-function MaterialColumns({ intents, blockedEarthVisualSpellIds, props = [] }) {
+function MaterialColumns({ intents, blockedEarthVisualSpellIds, props = [], onIntentSettled }) {
   const physicsInterceptions = usePhysicsColumnInterceptions(intents);
   const collisionBoxes = useMemo(
     () => (props ?? [])
@@ -4272,7 +4421,7 @@ function MaterialColumns({ intents, blockedEarthVisualSpellIds, props = [] }) {
         const direction = intent.sceneAxis ? toSceneAxis(intent.sceneAxis) : mapAxis(intent.axis);
         const worldScale = clamp(
           Number(intent._worldScale ?? MIN_PLACED_SPELL_SCALE),
-          MIN_PLACED_SPELL_SCALE,
+          MIN_MOUNTED_SPELL_WORLD_SCALE,
           4,
         );
         const height = Number(intent.physicsField?.length ?? (
@@ -4281,10 +4430,12 @@ function MaterialColumns({ intents, blockedEarthVisualSpellIds, props = [] }) {
             Math.max(0.9, intent.magnitude * 0.34 * Math.max(0.35, intent.signSizeScale ?? 1) + 0.78),
           ) * (intent.columnHeightMultiplier ?? 3) * worldScale
         ));
-        const radius = Math.max(
-          0.08,
-          worldThicknessRadiusForIntent(intent) * (intent.columnRadiusRatio ?? 0.7),
-        ) * worldScale;
+        const radius = Number(intent.physicsField?.radius ?? (
+          Math.max(
+            0.08,
+            worldThicknessRadiusForIntent(intent) * (intent.columnRadiusRatio ?? 0.7),
+          ) * worldScale
+        ));
         return columnRenderPlans(intent, { x: 0, y: 0.22, z: 0 }).map((plan) => {
           const key = `${intent.id}${plan.nameSuffix}`;
           return (
@@ -4296,6 +4447,7 @@ function MaterialColumns({ intents, blockedEarthVisualSpellIds, props = [] }) {
                 direction={direction}
                 baseRadius={radius * plan.radiusScale}
                 active={intent.active === true}
+                onLifecycleSettled={() => onIntentSettled?.(intent.id)}
                 collisionBoxes={
                   ['fire', 'wind'].includes(intent.materialKind)
                     ? [
@@ -4362,7 +4514,7 @@ function usePhysicsColumnInterceptions(intents) {
   return boxes;
 }
 
-function WaterDispersions({ intents }) {
+function WaterDispersions({ intents, onIntentSettled }) {
   const physicsContacts = usePhysicsDispersionContacts(intents);
   useEffect(() => {
     window.__WHA_NATIVE_SPELL_GEOMETRY__ = intents.map((intent) => {
@@ -4387,7 +4539,7 @@ function WaterDispersions({ intents }) {
         const origin = toVector3(intent.origin ?? centeredDispersionOrigin(frame));
         const placedWorldScale = clamp(
           Number(intent._worldScale ?? intent.worldScale ?? MIN_PLACED_SPELL_SCALE),
-          MIN_PLACED_SPELL_SCALE,
+          MIN_MOUNTED_SPELL_WORLD_SCALE,
           4,
         );
         const signScale = Math.max(0.35, intent.signSizeScale ?? 1);
@@ -4414,6 +4566,7 @@ function WaterDispersions({ intents }) {
             quadrantContacts={physicsContacts[intent.id]?.quadrants ?? null}
             surfaceY={0}
             active={intent.active === true}
+            onLifecycleSettled={() => onIntentSettled?.(intent.id)}
             showLabContext={false}
           />
           </group>
@@ -4445,7 +4598,7 @@ function usePhysicsDispersionContacts(intents) {
   return contacts;
 }
 
-function MaterialDispersions({ intents }) {
+function MaterialDispersions({ intents, onIntentSettled }) {
   useEffect(() => {
     if (intents.length === 0) return;
     window.__WHA_NATIVE_SPELL_GEOMETRY__ = intents.map((intent) => {
@@ -4470,7 +4623,7 @@ function MaterialDispersions({ intents }) {
         const origin = toVector3(intent.origin ?? centeredDispersionOrigin(frame));
         const worldScale = clamp(
           Number(intent._worldScale ?? intent.worldScale ?? MIN_PLACED_SPELL_SCALE),
-          MIN_PLACED_SPELL_SCALE,
+          MIN_MOUNTED_SPELL_WORLD_SCALE,
           4,
         );
         const signScale = Math.max(0.35, intent.signSizeScale ?? 1);
@@ -4497,6 +4650,7 @@ function MaterialDispersions({ intents }) {
               sealRadius={sealRadius}
               canopyReach={canopyReach}
               active={intent.active === true}
+              onLifecycleSettled={() => onIntentSettled?.(intent.id)}
               showLabContext={false}
               useInternalLight={intent.materialKind !== 'light'}
             />
@@ -5470,551 +5624,6 @@ function dispersionDebug(runtimeResult) {
     }));
 }
 
-function createWaterColumnSurfaceGeometry(ringCount, segmentCount) {
-  const positions = new Float32Array(ringCount * segmentCount * 3);
-  const uvs = [];
-  const indices = [];
-  for (let ring = 0; ring < ringCount; ring += 1) {
-    for (let segment = 0; segment < segmentCount; segment += 1) {
-      uvs.push(segment / segmentCount, ring / Math.max(1, ringCount - 1));
-    }
-  }
-  for (let ring = 0; ring < ringCount - 1; ring += 1) {
-    for (let segment = 0; segment < segmentCount; segment += 1) {
-      const nextSegment = (segment + 1) % segmentCount;
-      const a = ring * segmentCount + segment;
-      const b = ring * segmentCount + nextSegment;
-      const c = (ring + 1) * segmentCount + segment;
-      const d = (ring + 1) * segmentCount + nextSegment;
-      indices.push(a, c, b, b, c, d);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.userData = { ringCount, segmentCount };
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function updateWaterColumnSurfaceGeometry(geometry, system, timeSec, options = {}) {
-  if (!geometry) return;
-  const ringCount = geometry.userData.ringCount ?? 12;
-  const segmentCount = geometry.userData.segmentCount ?? 14;
-  const radiusScale = options.radiusScale ?? 1;
-  const turbulenceScale = options.turbulenceScale ?? 1;
-  const centerPulseScale = options.centerPulseScale ?? 1;
-  const position = geometry.attributes.position;
-  let cursor = 0;
-  for (let ring = 0; ring < ringCount; ring += 1) {
-    const t = ring / (ringCount - 1);
-    const center = waterSurfaceCenter(system, t, timeSec, centerPulseScale);
-    for (let segment = 0; segment < segmentCount; segment += 1) {
-      const angle = (segment / segmentCount) * Math.PI * 2;
-      const surfaceRadius = waterSurfaceRadius(system, t, angle, timeSec) * radiusScale;
-      const wrinkle =
-        1 +
-        Math.sin(angle * 3 + t * 8.2 - timeSec * 7.5 + system.seed * 5) * 0.08 * turbulenceScale +
-        Math.cos(angle * 5 - t * 5.3 + timeSec * 4.8) * 0.045 * turbulenceScale;
-      const x = Math.cos(angle) * surfaceRadius * wrinkle;
-      const z = Math.sin(angle) * surfaceRadius * (0.82 + Math.sin(t * Math.PI) * 0.12);
-      const vertex = center
-        .clone()
-        .add(system.basis.right.clone().multiplyScalar(x))
-        .add(system.basis.up.clone().multiplyScalar(z));
-      position.setXYZ(cursor, vertex.x, vertex.y, vertex.z);
-      cursor += 1;
-    }
-  }
-  position.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-}
-
-function createIrregularPoolGeometry(pointCount, seed) {
-  const positions = new Float32Array((pointCount + 1) * 3);
-  const indices = [];
-  for (let index = 1; index <= pointCount; index += 1) {
-    const next = index === pointCount ? 1 : index + 1;
-    indices.push(0, index, next);
-  }
-  const random = seededProfileRandom(seed, pointCount + 17);
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  geometry.userData = {
-    pointCount,
-    outlineNoise: Array.from({ length: pointCount }, () => 0.72 + random() * 0.56),
-  };
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function updateIrregularPoolGeometry(geometry, pool) {
-  if (!geometry) return;
-  const pointCount = geometry.userData.pointCount ?? 24;
-  const noise = geometry.userData.outlineNoise ?? [];
-  const position = geometry.attributes.position;
-  position.setXYZ(0, pool.center.x, pool.y, pool.center.z);
-  const angleOffset = pool.angle ?? 0;
-  for (let index = 0; index < pointCount; index += 1) {
-    const angle = (index / pointCount) * Math.PI * 2;
-    const edge = 1 + ((noise[index] ?? 1) - 1) * (pool.edgeNoise ?? 0.18);
-    const localX = Math.cos(angle) * pool.radiusX * edge;
-    const localZ = Math.sin(angle) * pool.radiusZ * edge;
-    const rotatedX = localX * Math.cos(angleOffset) - localZ * Math.sin(angleOffset);
-    const rotatedZ = localX * Math.sin(angleOffset) + localZ * Math.cos(angleOffset);
-    position.setXYZ(index + 1, pool.center.x + rotatedX, pool.y, pool.center.z + rotatedZ);
-  }
-  position.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-}
-
-function updateSurfaceStreaks(meshes, system, timeSec) {
-  for (const [index, streak] of meshes.entries()) {
-    if (!streak) continue;
-    const profile = lobeProfile(index, system.seed);
-    const t = (profile.t + timeSec * profile.speed) % 1;
-    if (t > system.activeLengthScale + 0.035) {
-      streak.visible = false;
-      continue;
-    }
-    streak.visible = true;
-    const lateralWave = Math.sin(timeSec * profile.wobble + profile.phase);
-    const surfaceRadius = waterSurfaceRadius(system, t, profile.phase, timeSec) * 1.02;
-    const offset = system.basis.right
-      .clone()
-      .multiplyScalar(Math.cos(profile.phase + timeSec * 0.7) * surfaceRadius)
-      .add(
-        system.basis.up
-          .clone()
-          .multiplyScalar(Math.sin(profile.phase + timeSec * 0.7) * surfaceRadius + lateralWave * system.radius * 0.08),
-      );
-    streak.position.copy(
-      system.origin.clone().add(system.dir.clone().multiplyScalar(system.height * t * system.activeLengthScale)).add(offset),
-    );
-    streak.quaternion.copy(quaternionFromUp(system.dir.clone().multiplyScalar(1.8).add(offset.clone().multiplyScalar(0.18))));
-    const width = system.radius * (0.018 + profile.size * 0.012);
-    streak.scale.set(width, system.radius * (0.2 + profile.size * 0.13), width * 0.7);
-  }
-}
-
-function updateTopSpray(meshes, system, timeSec) {
-  for (const [index, spray] of meshes.entries()) {
-    if (!spray || !system.topBreakupAllowed || system.activeLengthScale < 0.68 || system.pressureContacts.coreBlocked) {
-      if (spray) spray.visible = false;
-      continue;
-    }
-    const profile = lobeProfile(index + 37, system.seed + 0.19);
-    const age = (timeSec * (0.85 + profile.speed) + profile.t) % 1;
-    const angle = profile.phase + Math.sin(timeSec * 1.7 + index) * 0.2;
-    const outward = system.basis.right
-      .clone()
-      .multiplyScalar(Math.cos(angle))
-      .add(system.basis.up.clone().multiplyScalar(Math.sin(angle)));
-    const top = waterSurfaceCenter(system, 0.92, timeSec);
-    const velocity = system.dir
-      .clone()
-      .multiplyScalar(0.7 + profile.size * 0.25)
-      .add(outward.clone().multiplyScalar(0.55 + profile.radiusFactor * 0.45))
-      .add(new THREE.Vector3(0, -0.45 * age, 0));
-    spray.visible = age < 0.66;
-    spray.position.copy(
-      top
-        .add(outward.clone().multiplyScalar(system.radius * (0.35 + age * 1.2)))
-        .add(system.dir.clone().multiplyScalar(system.radius * (0.2 + age * 0.9)))
-        .add(new THREE.Vector3(0, -age * age * 0.42, 0)),
-    );
-    spray.quaternion.copy(quaternionFromUp(velocity));
-    const width = system.radius * (0.038 + profile.size * 0.018);
-    spray.scale.set(width, width * (0.78 + age * 0.35), width * 0.76);
-  }
-}
-
-function updateContactSpray(meshes, system, timeSec) {
-  const contact = system.pressureContacts?.strongest;
-  for (const [index, mist] of meshes.entries()) {
-    if (!mist || !contact || contact.classification === 'none') {
-      if (mist) mist.visible = false;
-      continue;
-    }
-    const profile = lobeProfile(index + 151, system.seed + 0.41);
-    const age = (timeSec * (1.4 + profile.speed) + profile.t) % 1;
-    const sideAngle = profile.phase + age * 1.6;
-    const side = system.basis.right
-      .clone()
-      .multiplyScalar(Math.cos(sideAngle))
-      .add(system.basis.up.clone().multiplyScalar(Math.sin(sideAngle)));
-    const blockedBoost = contact.classification === 'core_block' ? 1.35 : 1;
-    const pressure = clamp(contact.localPressure / 7, 0.28, 1.35);
-    const contactNormal = contact.contactNormal ?? side;
-    const sprayDirection = side
-      .clone()
-      .multiplyScalar(0.45 + pressure * 0.34)
-      .add(contactNormal.clone().multiplyScalar(0.24))
-      .add(system.dir.clone().multiplyScalar(contact.classification === 'core_block' ? -0.16 : 0.12));
-    mist.visible = age < 0.74;
-    mist.position.copy(
-      contact.contactPoint
-        .clone()
-        .add(sprayDirection.clone().multiplyScalar(system.radius * (0.35 + age * 2.1) * blockedBoost))
-        .add(new THREE.Vector3(0, Math.sin(age * Math.PI) * system.radius * 0.55, 0)),
-    );
-    mist.quaternion.copy(quaternionFromUp(sprayDirection));
-    const size = system.radius * (0.09 + profile.size * 0.055) * (1 - age * 0.38) * blockedBoost;
-    mist.scale.set(size * 1.18, size * 0.82, size);
-  }
-}
-
-function updateParticles(droplets, splashes, system, timeSec) {
-  const particleStates = system.particles.map((particle) =>
-    simulateWaterParticle(system, particle, (timeSec + particle.birthOffset) % particle.lifetime),
-  );
-  let inFlight = 0;
-  let splash = 0;
-  let fadedAfterSplash = 0;
-  for (const [index, state] of particleStates.entries()) {
-    const mesh = droplets[index];
-    const particle = system.particles[index];
-    if (!mesh) continue;
-    if (state.state === 'flight') {
-      inFlight += particle.volumeShare;
-      mesh.visible = true;
-      mesh.position.copy(state.position);
-      mesh.quaternion.copy(quaternionFromUp(state.velocity ?? system.dir));
-      const size = system.radius * (0.052 + particle.size * 0.026);
-      mesh.scale.set(size * 0.86, size * 1.28, size * 0.82);
-    } else if (state.state === 'splash') {
-      splash += particle.volumeShare;
-      mesh.visible = false;
-    } else {
-      mesh.visible = false;
-      fadedAfterSplash += particle.volumeShare;
-    }
-  }
-  for (const [index, mesh] of splashes.entries()) {
-    const state = particleStates[index];
-    const particle = system.particles[index];
-    if (!mesh) continue;
-    if (state?.state === 'splash') {
-      mesh.visible = true;
-      mesh.position.copy(state.position);
-      mesh.quaternion.copy(quaternionFromUp(state.velocity ?? new THREE.Vector3(0, 1, 0)));
-      const size = system.radius * (0.072 + particle.size * 0.036) * (1 - state.splashProgress * 0.46);
-      mesh.scale.set(size * 1.15, size * 0.74, size * 0.92);
-    } else {
-      mesh.visible = false;
-    }
-  }
-  return {
-    total: system.particles.reduce((sum, particle) => sum + particle.volumeShare, 0),
-    inFlight,
-    splash,
-    fadedAfterSplash,
-  };
-}
-
-function waterDebug(system, clockMs, eruptionScale, volume) {
-  const pressureContacts = system.pressureContacts ?? { contacts: [] };
-  return {
-    intentId: system.intent.id,
-    renderer: 'three',
-    visualPreset: 'three_pressure_stream_contact_solver_no_pooling',
-    deterministic: true,
-    keyframed: false,
-    collisionDriven: true,
-    collisionModel: 'ground_plane_first_pass',
-    architecture: 'react_three_fiber_authored_visual_stream_plus_contact_debug',
-    visualLayer: 'dense_water_mass_surface_turbulence_local_spray',
-    physicsLayer: 'pressure_contact_solver_debug_only_no_direct_position_setting',
-    eruptionDurationMs: 500,
-    eruptionScale: round(eruptionScale),
-    streamLengthScale: round(system.activeLengthScale),
-    contactPolicy: 'local_contact_classification_edge_partial_core',
-    poolingPolicy: 'disabled_by_visual_scope',
-    primitivePolicy: 'dense_irregular_surface_no_stretched_sphere_or_cylinder',
-    contactSolver: {
-      enabled: true,
-      contacts: pressureContacts.contacts.map((contact) => ({
-        propId: contact.propId,
-        classification: contact.classification,
-        coverage: round(contact.coverage),
-        radialFalloff: round(contact.radialFalloff),
-        axialDistance: round(contact.axialDistance),
-        localPressure: round(contact.localPressure),
-        forceMode: 'debug_vector_only_until_rigid_body_adapter',
-        contactPoint: vectorDebug(contact.contactPoint),
-      })),
-      coreBlocked: pressureContacts.coreBlocked,
-      strongestContactType: pressureContacts.strongest?.classification ?? 'none',
-    },
-    seed: round(system.seed),
-    simulationTimeMs: Math.round(clockMs),
-    particleCount: system.particleCount,
-    poolCount: 0,
-    volume: {
-      total: round(volume.total),
-      inFlight: round(volume.inFlight),
-      splash: round(volume.splash),
-      fadedAfterSplash: round(volume.fadedAfterSplash),
-    },
-    pools: [],
-  };
-}
-
-function solveWaterColumnContacts(system, props, eruptionScale) {
-  const activeHeight = Math.max(system.height * eruptionScale, system.radius * 0.5);
-  const contacts = [];
-  for (const prop of props ?? []) {
-    if (prop.visualKind === 'activation_ring_key') continue;
-    const contact = classifyWaterColumnPropContact(system, prop, activeHeight);
-    if (contact.classification !== 'none') contacts.push(contact);
-  }
-  contacts.sort((a, b) => b.localPressure - a.localPressure);
-  const strongest = contacts[0] ?? null;
-  const coreBlocked = strongest?.classification === 'core_block';
-  const streamLengthScale = coreBlocked
-    ? clamp(strongest.axialDistance / Math.max(0.001, system.height), 0.16, 1)
-    : 1;
-  return { contacts, strongest, coreBlocked, streamLengthScale };
-}
-
-function classifyWaterColumnPropContact(system, prop, activeHeight) {
-  const bounds = propContactBounds(prop);
-  const samples = propContactSamples(bounds);
-  const pressureRadius = system.radius * 1.45 + bounds.radius * 0.15;
-  let insideCount = 0;
-  let coreCount = 0;
-  const weightedPoint = new THREE.Vector3();
-  let totalWeight = 0;
-  let axialTotal = 0;
-  let radialFalloffTotal = 0;
-  const contactNormal = new THREE.Vector3();
-  for (const point of samples) {
-    const relative = point.clone().sub(system.origin);
-    const axial = relative.dot(system.dir);
-    if (axial < 0 || axial > activeHeight) continue;
-    const centerlinePoint = system.origin.clone().add(system.dir.clone().multiplyScalar(axial));
-    const radial = point.clone().sub(centerlinePoint);
-    const radialDistance = radial.length();
-    if (radialDistance > pressureRadius) continue;
-    const radialFalloff = 1 - clamp(radialDistance / pressureRadius, 0, 1);
-    const weight = 0.2 + radialFalloff * radialFalloff;
-    insideCount += 1;
-    if (radialDistance <= system.radius * 0.5) coreCount += 1;
-    weightedPoint.add(point.clone().multiplyScalar(weight));
-    totalWeight += weight;
-    axialTotal += axial * weight;
-    radialFalloffTotal += radialFalloff * weight;
-    if (radialDistance > 0.0001) contactNormal.add(radial.normalize().multiplyScalar(weight));
-  }
-  if (insideCount === 0 || totalWeight <= 0) return { propId: prop.id, classification: 'none' };
-  const coverage = insideCount / samples.length;
-  const contactPoint = weightedPoint.multiplyScalar(1 / totalWeight);
-  const axialDistance = axialTotal / totalWeight;
-  const radialFalloff = radialFalloffTotal / totalWeight;
-  const classification =
-    coreCount > 0 && coverage >= 0.18
-      ? 'core_block'
-      : coverage >= 0.28 || insideCount >= 5
-        ? 'partial_hit'
-        : 'edge_graze';
-  const mass = Math.max(0.2, prop.mass ?? (prop.movable === false ? 120 : 4));
-  const pressure = (system.intent.resourceBudget?.amount ?? 8) * (0.8 + radialFalloff * 1.4);
-  return {
-    propId: prop.id,
-    classification,
-    movable: prop.movable !== false,
-    coverage,
-    radialFalloff,
-    axialDistance,
-    contactPoint,
-    contactNormal:
-      contactNormal.lengthSq() > 0.0001
-        ? contactNormal.normalize()
-        : system.dir.clone().multiplyScalar(-1),
-    localPressure: pressure / Math.sqrt(mass),
-  };
-}
-
-function propContactBounds(prop) {
-  const dimensions = mainWorldPropDimensions(prop);
-  if (prop.visualKind === 'tree_apple') {
-    const diameter = Math.max(0.12, (prop.size ?? 0.42) * 0.5);
-    const center = toVector3(prop.position, 0.22);
-    return {
-      center,
-      half: new THREE.Vector3(diameter / 2, diameter / 2, diameter / 2),
-      radius: diameter / 2,
-    };
-  }
-  const center = toVector3(prop.position, mainWorldPropCenterOffset(prop));
-  const half = new THREE.Vector3(dimensions.x / 2, dimensions.y / 2, dimensions.z / 2);
-  return {
-    center,
-    half,
-    radius: half.length(),
-  };
-}
-
-function propContactSamples(bounds) {
-  const { center, half } = bounds;
-  const samples = [center.clone()];
-  samples.push(
-    center.clone().add(new THREE.Vector3(half.x, 0, 0)),
-    center.clone().add(new THREE.Vector3(-half.x, 0, 0)),
-    center.clone().add(new THREE.Vector3(0, half.y, 0)),
-    center.clone().add(new THREE.Vector3(0, -half.y, 0)),
-    center.clone().add(new THREE.Vector3(0, 0, half.z)),
-    center.clone().add(new THREE.Vector3(0, 0, -half.z)),
-  );
-  for (const x of [-half.x, half.x]) {
-    for (const y of [-half.y, half.y]) {
-      for (const z of [-half.z, half.z]) {
-        samples.push(center.clone().add(new THREE.Vector3(x, y, z)));
-      }
-    }
-  }
-  return samples;
-}
-
-function waterSurfaceCenter(system, t, timeSec, pulseScale = 1) {
-  const activeHeight = system.activeHeight ?? system.height;
-  const sway =
-    Math.sin(t * Math.PI * 1.4 + timeSec * 2.1 + system.seed * 4) *
-    system.radius *
-    0.055 *
-    pulseScale;
-  const pulse = Math.sin(t * Math.PI * 4.6 - timeSec * 6.8) * system.radius * 0.022 * pulseScale;
-  return system.origin
-    .clone()
-    .add(system.dir.clone().multiplyScalar(activeHeight * t))
-    .add(system.basis.right.clone().multiplyScalar(sway))
-    .add(system.basis.up.clone().multiplyScalar(pulse));
-}
-
-function waterSurfaceRadius(system, t, angle, timeSec) {
-  const eruptionOpening = clamp((system.activeLengthScale ?? 1) * 1.35, 0.22, 1);
-  const throat = 0.76 + Math.sin(t * Math.PI) * 0.22;
-  const base = system.radius * throat * eruptionOpening;
-  const contactCompression = system.pressureContacts?.coreBlocked
-    ? 1 - Math.max(0, t - (system.pressureContacts.streamLengthScale ?? 1) * 0.78) * 0.38
-    : 1;
-  const risingBands =
-    Math.sin(t * 13.5 - timeSec * 8.2 + angle * 1.7 + system.seed * 7) * 0.065 +
-    Math.cos(t * 6.1 + timeSec * 2.8 - angle * 2.4) * 0.04;
-  const emitterPressureBulge = Math.max(0, 1 - t * 4) * 0.16;
-  const topBreakup = system.topBreakupAllowed ? Math.max(0, (t - 0.74) / 0.26) * -0.16 : 0;
-  const bottomThroat = Math.max(0, 1 - t * 6) * -0.06;
-  return Math.max(
-    system.radius * 0.34 * eruptionOpening,
-    base * (1 + risingBands + emitterPressureBulge + topBreakup + bottomThroat) * contactCompression,
-  );
-}
-
-function waterParticleProfiles(count, radius, height, seed) {
-  return Array.from({ length: count }, (_, index) => {
-    const random = seededProfileRandom(seed, index);
-    const angle = random() * Math.PI * 2;
-    const radial = Math.sqrt(random()) * radius * 0.42;
-    const sideSpeed = radius * (0.9 + random() * 1.2);
-    const sideAngle = random() * Math.PI * 2;
-    return {
-      birthOffset: random() * 1.25,
-      lifetime: 2.4 + random() * 1.25 + height * 0.08,
-      radialX: Math.cos(angle) * radial,
-      radialZ: Math.sin(angle) * radial,
-      sideX: Math.cos(sideAngle) * sideSpeed,
-      sideZ: Math.sin(sideAngle) * sideSpeed,
-      upwardSpeed: 3.1 + height * 0.34 + random() * 0.85,
-      drag: 0.82 + random() * 0.08,
-      size: 0.6 + random() * 0.8,
-      volumeShare: 1 / count,
-    };
-  });
-}
-
-function simulateWaterParticle(system, particle, ageSec) {
-  const gravity = new THREE.Vector3(0, -9.8, 0);
-  let position = system.origin
-    .clone()
-    .add(system.basis.right.clone().multiplyScalar(particle.radialX))
-    .add(system.basis.up.clone().multiplyScalar(particle.radialZ));
-  let velocity = system.dir
-    .clone()
-    .multiplyScalar(particle.upwardSpeed)
-    .add(system.basis.right.clone().multiplyScalar(particle.sideX))
-    .add(system.basis.up.clone().multiplyScalar(particle.sideZ));
-  const groundY = 0.052;
-  let elapsed = 0;
-  while (elapsed < ageSec) {
-    const dt = Math.min(1 / 36, ageSec - elapsed);
-    velocity = velocity.add(gravity.clone().multiplyScalar(dt));
-    velocity = velocity.multiplyScalar(Math.pow(particle.drag, dt));
-    const next = position.clone().add(velocity.clone().multiplyScalar(dt));
-    if (next.y <= groundY && velocity.y < 0) {
-      const hitT = clamp((position.y - groundY) / Math.max(0.0001, position.y - next.y), 0, 1);
-      const impactPosition = position.clone().lerp(next, hitT);
-      const impactVelocity = velocity.clone();
-      const afterImpact = ageSec - elapsed - dt * hitT;
-      if (afterImpact < 0.42) {
-        const splashVelocity = new THREE.Vector3(
-          impactVelocity.x * 0.34 + particle.sideX * 0.18,
-          Math.abs(impactVelocity.y) * 0.28 + 0.45,
-          impactVelocity.z * 0.34 + particle.sideZ * 0.18,
-        );
-        const splashPosition = impactPosition
-          .clone()
-          .add(splashVelocity.clone().multiplyScalar(afterImpact))
-          .add(gravity.clone().multiplyScalar(0.5 * afterImpact * afterImpact));
-        splashPosition.y = Math.max(groundY + 0.018, splashPosition.y);
-        return {
-          state: 'splash',
-          position: splashPosition,
-          velocity: splashVelocity,
-          impactPosition,
-          splashProgress: afterImpact / 0.42,
-        };
-      }
-      return { state: 'spent', impactPosition };
-    }
-    position = next;
-    elapsed += dt;
-  }
-  return { state: 'flight', position, velocity };
-}
-
-function lobeProfile(index, seed) {
-  const random = seededProfileRandom(seed + 0.37, index + 91);
-  return {
-    t: random(),
-    speed: 0.09 + random() * 0.18,
-    radiusFactor: 0.18 + random() * 0.56,
-    phase: random() * Math.PI * 2,
-    wobble: 2.3 + random() * 4.8,
-    size: 0.7 + random() * 0.8,
-  };
-}
-
-function seededProfileRandom(seed, index) {
-  let state = Math.floor((seed * 1000000 + index * 1013904223) % 2147483647);
-  if (state <= 0) state += 2147483646;
-  return () => {
-    state = (state * 16807) % 2147483647;
-    return (state - 1) / 2147483646;
-  };
-}
-
-function hashStringToUnit(value) {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return ((hash >>> 0) % 1000000) / 1000000;
-}
 
 function columnRenderPlans(intent, fallbackOrigin) {
   const anchors = intent.emergence?.anchors ?? [];
@@ -6052,190 +5661,6 @@ function dispersionRenderPlans(intent, fallbackOrigin) {
   }];
 }
 
-function worldThicknessRadiusForIntent(intent) {
-  const source = intent.renderGeometry ?? intent.geometry ?? intent;
-  const explicitWorldRadius = Number(
-    source.worldThicknessRingRadius ?? source.worldRadius ?? source.radiusWorld,
-  );
-  if (Number.isFinite(explicitWorldRadius)) return Math.max(0.2, explicitWorldRadius);
-  const displayMaxRadius = Math.max(
-    120,
-    Number(intent.displayMaxRadius ?? intent.thicknessRingRadius ?? 120),
-  );
-  const rawRingRadius = Math.max(1, Number(intent.thicknessRingRadius ?? displayMaxRadius));
-  return Math.max(
-    1.2,
-    (rawRingRadius * 1.2) / displayMaxRadius,
-  );
-}
-
-function symbolPosition(symbol, scale) {
-  if (symbol.position) {
-    return {
-      x: (symbol.position.x ?? 0) * scale,
-      // The render group's local +Z is opposite the compiler frame's
-      // bitangent. Mirror program Y so each sign is drawn on the same side
-      // that owns its column push contribution.
-      z: -(symbol.position.y ?? 0) * scale,
-    };
-  }
-  const angle = ((symbol.polarAngleDeg ?? 0) * Math.PI) / 180;
-  const radius = (symbol.polarRadius ?? 0) * scale;
-  return { x: Math.cos(angle) * radius, z: -Math.sin(angle) * radius };
-}
-
-function centeredDispersionOrigin(frame) {
-  return toVector3(frame.origin)
-    .add(frame.normal.clone().multiplyScalar(0.22 * frame.worldScale));
-}
-
-function anchorForPolarAngle(angleDeg = 0) {
-  const radians = (Number(angleDeg) * Math.PI) / 180;
-  return { x: Math.cos(radians), y: Math.sin(radians) };
-}
-
-function environmentPalette(environmentMode) {
-  if (environmentMode === 'night') {
-    return {
-      clear: '#0f1421',
-      fog: '#101827',
-      sky: '#0a0f1f',
-      ambient: 0.28,
-      sun: 0.16,
-      ambientColor: '#8e9ec4',
-      sunColor: '#b9c3e8',
-    };
-  }
-  if (environmentMode === 'dusk') {
-    return {
-      clear: '#9e758c',
-      fog: '#9e758c',
-      sky: '#ad6b75',
-      ambient: 0.48,
-      sun: 0.44,
-      ambientColor: '#f1c5ae',
-      sunColor: '#ffc083',
-    };
-  }
-  return {
-    clear: '#b8d9f0',
-    fog: '#b8d9f0',
-    sky: '#9ec7eb',
-    ambient: 0.78,
-    sun: 0.82,
-    ambientColor: '#e7f5db',
-    sunColor: '#fff0c8',
-  };
-}
-
-function normalizeFrame(frame = DEFAULT_FRAME) {
-  const normal = toSceneAxis(frame.normal ?? DEFAULT_FRAME.normal);
-  const tangent = toSceneAxis(frame.tangent ?? DEFAULT_FRAME.tangent);
-  const bitangent =
-    frame.bitangent != null
-      ? toSceneAxis(frame.bitangent)
-      : new THREE.Vector3().crossVectors(normal, tangent).normalize();
-  return {
-    origin: frame.origin ?? DEFAULT_FRAME.origin,
-    normal,
-    tangent,
-    bitangent,
-    worldScale: clamp(
-      Number(frame.worldScale ?? MIN_PLACED_SPELL_SCALE),
-      MIN_PLACED_SPELL_SCALE,
-      4,
-    ),
-  };
-}
-
-function mapAxis(axis) {
-  const mapped = axis
-    ? new THREE.Vector3(axis.x ?? 0, axis.z ?? 1, axis.y ?? 0)
-    : new THREE.Vector3(0, 1, 0);
-  if (mapped.lengthSq() <= 0.000001) return new THREE.Vector3(0, 1, 0);
-  return mapped.normalize();
-}
-
-function toSceneAxis(axis) {
-  if (axis instanceof THREE.Vector3) return axis.clone().normalize();
-  const vector = new THREE.Vector3(axis?.x ?? 0, axis?.y ?? 1, axis?.z ?? 0);
-  if (vector.lengthSq() <= 0.000001) return new THREE.Vector3(0, 1, 0);
-  return vector.normalize();
-}
-
-function perpendicularBasis(direction) {
-  const dir = direction.lengthSq() > 0.000001 ? direction.clone().normalize() : new THREE.Vector3(0, 1, 0);
-  const reference = Math.abs(dir.dot(new THREE.Vector3(0, 1, 0))) > 0.92
-    ? new THREE.Vector3(1, 0, 0)
-    : new THREE.Vector3(0, 1, 0);
-  const right = new THREE.Vector3().crossVectors(dir, reference).normalize();
-  const up = new THREE.Vector3().crossVectors(right, dir).normalize();
-  return { right, up };
-}
-
-function quaternionFromUp(direction) {
-  const dir = direction.lengthSq() > 0.000001 ? direction.clone().normalize() : new THREE.Vector3(0, 1, 0);
-  return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-}
-
-function quaternionFromFrame(normalInput, tangentInput) {
-  const normal = toSceneAxis(normalInput);
-  let tangent = toSceneAxis(tangentInput);
-  tangent = tangent.sub(normal.clone().multiplyScalar(tangent.dot(normal))).normalize();
-  if (tangent.lengthSq() <= 0.000001) {
-    tangent = Math.abs(normal.y) > 0.9
-      ? new THREE.Vector3(1, 0, 0)
-      : new THREE.Vector3(0, 1, 0).cross(normal).normalize();
-  }
-  const localZ = new THREE.Vector3().crossVectors(tangent, normal).normalize();
-  const matrix = new THREE.Matrix4().makeBasis(tangent, normal, localZ);
-  return new THREE.Quaternion().setFromRotationMatrix(matrix);
-}
-
-function toVector3(position = {}, yOverride) {
-  return new THREE.Vector3(position.x ?? 0, yOverride ?? position.y ?? 0, position.z ?? 0);
-}
-
-function vectorArray(position = {}, yOverride) {
-  return [position.x ?? 0, yOverride ?? position.y ?? 0, position.z ?? 0];
-}
-
-function vectorDebug(vector) {
-  return {
-    x: round(vector.x ?? 0),
-    y: round(vector.y ?? 0),
-    z: round(vector.z ?? 0),
-  };
-}
-
-function safeMeshId(value) {
-  return String(value).replace(/[^a-zA-Z0-9:_-]/g, '-');
-}
-
-function easeOutCubic(value) {
-  return 1 - Math.pow(1 - value, 3);
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function horizontalBasis(forwardInput) {
-  const forward = new THREE.Vector3(forwardInput.x, 0, forwardInput.z);
-  if (forward.lengthSq() <= 0.000001) forward.set(0, 0, -1);
-  forward.normalize();
-  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-  return { forward, right };
-}
-
-function lookDirectionFor(yaw, pitch) {
-  const horizontal = Math.cos(pitch);
-  return new THREE.Vector3(
-    Math.sin(yaw) * horizontal,
-    Math.sin(pitch),
-    Math.cos(yaw) * horizontal,
-  ).normalize();
-}
 
 function resolveThirdPersonCamera(playerPosition, yaw, pitch, playerController) {
   const lookDirection = lookDirectionFor(yaw, pitch);
@@ -6308,8 +5733,4 @@ function readPlayerPitch(state, fallback = 0) {
 function normalizeYaw(value) {
   const fullTurn = Math.PI * 2;
   return ((value + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
-}
-
-function round(value) {
-  return Math.round((value + Number.EPSILON) * 1000) / 1000;
 }

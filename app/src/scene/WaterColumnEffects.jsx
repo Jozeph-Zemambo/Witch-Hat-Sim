@@ -89,6 +89,7 @@ export function PromotedWaterColumnEffect({
   collisionBoxes = [],
   showLabContext = true,
   effectId = 'lab',
+  onLifecycleSettled,
 }) {
   const streamRef = useRef(null);
   const innerRef = useRef(null);
@@ -101,6 +102,15 @@ export function PromotedWaterColumnEffect({
   const animationAccumulatorRef = useRef(0);
   const idleHiddenRef = useRef(false);
   const lifeRef = useRef({ phase: active ? 'starting' : 'idle', t: 0, endFront: 1 });
+  const settledNotifiedRef = useRef(!active);
+  useEffect(() => () => {
+    if (showLabContext || typeof window === 'undefined') return;
+    const entries = window.__WHA_MAIN_WATER_COLUMNS__ ?? {};
+    if (!(effectId in entries)) return;
+    const next = { ...entries };
+    delete next[effectId];
+    window.__WHA_MAIN_WATER_COLUMNS__ = next;
+  }, [effectId, showLabContext]);
   const streamGeometry = useMemo(
     () => createWaterStreamGeometry(12, 12),
     [],
@@ -209,6 +219,7 @@ export function PromotedWaterColumnEffect({
   ]);
 
   useFrame((state, delta) => {
+    if (active) settledNotifiedRef.current = false;
     if (lifeRef.current.phase === 'idle' && !active) {
       if (!idleHiddenRef.current) {
         hideWaterColumnMeshes({
@@ -246,6 +257,10 @@ export function PromotedWaterColumnEffect({
         splashes: splashRefs.current,
       });
       idleHiddenRef.current = true;
+      if (!settledNotifiedRef.current) {
+        settledNotifiedRef.current = true;
+        onLifecycleSettled?.();
+      }
       return;
     }
 
@@ -480,6 +495,7 @@ export function PromotedElementColumnEffect({
   effectId = 'lab',
   useInternalLight = true,
   crumbleWholeOutputOnEarlyEnd = false,
+  onLifecycleSettled,
 }) {
   const visual = elementVisual(element);
   const columnRef = useRef(null);
@@ -492,6 +508,15 @@ export function PromotedElementColumnEffect({
   const capBaseRef = useRef(null);
   const accumulatorRef = useRef(0);
   const lifeRef = useRef({ phase: active ? 'starting' : 'idle', t: 0, endFront: 1 });
+  const settledNotifiedRef = useRef(!active);
+  useEffect(() => () => {
+    if (showLabContext || typeof window === 'undefined') return;
+    const entries = window.__WHA_MAIN_ELEMENT_COLUMNS__ ?? {};
+    if (!(effectId in entries)) return;
+    const next = { ...entries };
+    delete next[effectId];
+    window.__WHA_MAIN_ELEMENT_COLUMNS__ = next;
+  }, [effectId, showLabContext]);
 
   const geometry = useMemo(() => createWaterStreamGeometry(26, 14), []);
   const innerGeometry = useMemo(() => createWaterStreamGeometry(18, 12), []);
@@ -529,6 +554,7 @@ export function PromotedElementColumnEffect({
   const columnLength = blocked ? Math.max(0.05, hit.distance) : spellLength;
 
   useFrame((state, delta) => {
+    if (active) settledNotifiedRef.current = false;
     accumulatorRef.current += Math.min(delta, 0.05);
     if (accumulatorRef.current < 1 / 30) return;
     const animationDelta = accumulatorRef.current;
@@ -553,6 +579,10 @@ export function PromotedElementColumnEffect({
       hideChunks(streakRefs.current);
       hideChunks(tipFxRefs.current);
       if (lightRef.current) lightRef.current.intensity = 0;
+      if (!settledNotifiedRef.current) {
+        settledNotifiedRef.current = true;
+        onLifecycleSettled?.();
+      }
       return;
     }
 
@@ -978,7 +1008,10 @@ function updateColumnCrumble(chunks, { eruptionPoint, direction, spellLength, en
       .multiplyScalar(Math.cos(scatterAngle) * scatter)
       .add(basis.up.clone().multiplyScalar(Math.sin(scatterAngle) * scatter));
     const y = Math.max(GROUND_Y + 0.05, base.y + lateral.y - fall);
-    chunk.visible = fade > 0.02;
+    // The lifecycle owns removal. Keep every reached chunk present through the
+    // full ending phase, even when its final opacity is nearly zero, then let
+    // the idle branch hide the complete set atomically.
+    chunk.visible = true;
     chunk.position.set(base.x + lateral.x, y, base.z + lateral.z);
     chunk.rotation.set(index + t * 3, index * 0.7 + t * 2, t * 1.5);
     chunk.scale.setScalar(radius * (0.7 + (index % 3) * 0.25));

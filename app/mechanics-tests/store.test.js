@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { transformDirection, transformPoint } from '../../src/mechanics-engine/index.js';
 import { useMechanicsStore } from '../src/mechanics/mechanicsStore.js';
+import { worldFrameForDevice } from '../src/mechanics/spell-device-system.js';
 import { useSpellStore } from '../src/store.js';
 
 test('player state persists bounded pitch and the selected camera mode across mechanics', () => {
@@ -52,6 +53,42 @@ test('scene scaling bakes into serializable part sizes and remains undoable', ()
 
   useMechanicsStore.getState().undo();
   assert.deepEqual(useMechanicsStore.getState().document.assemblies[0].parts[0].size, before.parts[0].size);
+});
+
+test('root assembly scaling carries its mounted spell plate and output scale', () => {
+  const store = useMechanicsStore.getState();
+  store.loadStarter('pressure-plate');
+  const beforeDocument = useMechanicsStore.getState().document;
+  const beforeDevice = beforeDocument.spellDevices[0];
+  const beforeAssembly = beforeDocument.assemblies.find(
+    (assembly) => assembly.assemblyId === beforeDevice.assemblyId,
+  );
+  const beforeFrame = worldFrameForDevice(beforeDevice, beforeAssembly.transform);
+
+  useMechanicsStore.getState().setAssemblyTransform(beforeAssembly.assemblyId, {
+    position: beforeAssembly.transform.position,
+    rotation: beforeAssembly.transform.rotation,
+    scale: { x: 0.2, y: 0.2, z: 0.2 },
+  });
+  const scaledDocument = useMechanicsStore.getState().document;
+  const scaledDevice = scaledDocument.spellDevices[0];
+  const scaledAssembly = scaledDocument.assemblies.find(
+    (assembly) => assembly.assemblyId === scaledDevice.assemblyId,
+  );
+  const scaledFrame = worldFrameForDevice(scaledDevice, scaledAssembly.transform);
+
+  assert.ok(Math.abs(scaledDevice.plateRadius - beforeDevice.plateRadius * 0.2) < 1e-9);
+  for (const axis of ['x', 'y', 'z']) {
+    assert.ok(
+      Math.abs(
+        scaledDevice.localFrame.origin[axis] - beforeDevice.localFrame.origin[axis] * 0.2,
+      ) < 1e-9,
+    );
+  }
+  assert.ok(Math.abs(scaledFrame.worldScale - beforeFrame.worldScale * 0.2) < 1e-9);
+
+  useMechanicsStore.getState().undo();
+  assert.deepEqual(useMechanicsStore.getState().document.spellDevices[0], beforeDevice);
 });
 
 test('saved blueprints support edit, overwrite, and save-as-new without changing the original copy', () => {
@@ -444,6 +481,7 @@ test('spell plates can move, resize, rotate, and change hosts without losing the
   }), true);
   device = useMechanicsStore.getState().document.spellDevices.find((item) => item.deviceId === before.deviceId);
   assert.ok(Math.abs(device.plateRadius - 1.05) < 1e-9);
+  assert.ok(Math.abs(worldFrameForDevice(device, newHost.transform).worldScale - 1.375) < 1e-9);
   assert.ok(Math.abs(transformPoint(newHost.transform, device.localFrame.origin).y - (movedWorld.y + 0.2)) < 1e-9);
   const rotatedNormal = transformDirection(newHost.transform, device.localFrame.normal);
   assert.ok(Math.abs(rotatedNormal.x - 1) < 1e-9);

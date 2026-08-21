@@ -756,6 +756,45 @@ test('rotary cam gates sequence mounted spells from one driven shaft', () => {
   mechanics.dispose();
 });
 
+test('gate shutdown preserves lifecycle-managed mounted outputs for their ending phase', () => {
+  const deviceId = 'spell-device:ending-water';
+  const document = createMechanicsDocument({
+    assemblies: [boxAssembly('assembly:ending-water', { x: 0, y: 1, z: 0 }, 'fixed')],
+    spellDevices: [createSpellDevice({
+      deviceId,
+      assemblyId: 'assembly:ending-water',
+      spellTemplateId: 'water-column',
+      gateId: 'gate:ending-water',
+    })],
+  });
+  const mechanics = new RapierMechanicsWorld(R, document);
+  const snapshot = mechanics.getSnapshot();
+  const active = evaluateMountedSpellDevices(document, {
+    ...snapshot,
+    gates: { 'gate:ending-water': { closed: true } },
+  });
+  const activeColumn = active.devices[0].outputIntents.find(
+    (intent) => intent.intentType === 'water_column',
+  );
+  assert.equal(active.devices[0].active, true);
+  assert.equal(activeColumn.active, true);
+  assert.equal(activeColumn.deactivating, false);
+
+  const ended = evaluateMountedSpellDevices(document, {
+    ...snapshot,
+    gates: { 'gate:ending-water': { closed: false } },
+  });
+  const endingColumn = ended.devices[0].outputIntents.find(
+    (intent) => intent.intentType === 'water_column',
+  );
+  assert.equal(ended.devices[0].active, false);
+  assert.equal(endingColumn.id, activeColumn.id, 'the visual consumer keeps its stable effect identity');
+  assert.equal(endingColumn.active, false);
+  assert.equal(endingColumn.deactivating, true);
+  assert.equal(ended.fields.some((field) => field.active !== false), false);
+  mechanics.dispose();
+});
+
 test('mountable spell plate derives its origin and force direction from the live body frame', () => {
   const rotation = quaternionFromAxisAngle({ x: 0, y: 1, z: 0 }, Math.PI / 2);
   const document = createMechanicsDocument({
@@ -858,6 +897,78 @@ test('mounted plates consume their serialized native Spellpad compiler result', 
   assert.equal(result.devices[0].socketed, true);
   assert.ok(result.fields.some((field) => field.materialKind === 'water'));
   mechanics.dispose();
+});
+
+test('custom mounted Spellpad geometry follows plate scale for every column material', () => {
+  const evaluateAtPlateRadius = (materialKind, plateRadius) => {
+    const deviceId = `spell-device:custom-${materialKind}`;
+    const assembly = boxAssembly(`assembly:custom-${materialKind}`, { x: 0, y: 1, z: 0 }, 'fixed');
+    const compileResult = compileSpell({
+      title: `Custom ${materialKind} scale contract`,
+      seals: [{
+        sigils: [{ name: materialKind }],
+        rings: [{ radius: 100 }],
+        signProfiles: [{
+          kind: 'column',
+          amount: 4,
+          size: 200,
+          rotation: 0,
+          angle: 0,
+          radius: 80,
+        }],
+      }],
+    });
+    const document = createMechanicsDocument({
+      assemblies: [assembly],
+      spellDevices: [createSpellDevice({
+        deviceId,
+        assemblyId: assembly.assemblyId,
+        plateRadius,
+        spellTemplateId: `spell-template:custom-${materialKind}`,
+        spell: {
+          templateId: `spell-template:custom-${materialKind}`,
+          name: `Custom ${materialKind}`,
+          compileResult,
+        },
+      })],
+    });
+    return evaluateMountedSpellDevices(document, {
+      assemblies: { [assembly.assemblyId]: assembly.transform },
+      gates: {},
+    }, {
+      manualActiveIds: new Set([deviceId]),
+    }).devices[0];
+  };
+
+  for (const materialKind of ['water', 'fire', 'earth', 'wind', 'light']) {
+    const small = evaluateAtPlateRadius(materialKind, 0.21);
+    const large = evaluateAtPlateRadius(materialKind, 0.42);
+    const smallColumn = small.outputIntents.find((intent) =>
+      ['water_column', 'material_column'].includes(intent.intentType),
+    );
+    const largeColumn = large.outputIntents.find((intent) =>
+      ['water_column', 'material_column'].includes(intent.intentType),
+    );
+
+    assert.equal(large.frame.worldScale, small.frame.worldScale * 2, materialKind);
+    assert.equal(largeColumn.physicsField.length, smallColumn.physicsField.length * 2, materialKind);
+    assert.equal(largeColumn.physicsField.radius, smallColumn.physicsField.radius * 2, materialKind);
+    assert.ok(
+      Math.abs(largeColumn.resourceBudget.amount - smallColumn.resourceBudget.amount * 8) < 0.001,
+      materialKind,
+    );
+    assert.equal(
+      largeColumn.physicsField.forceMagnitude,
+      smallColumn.physicsField.forceMagnitude,
+      `${materialKind} force semantics stay authored while only spatial size changes`,
+    );
+
+    if (materialKind === 'light') {
+      const smallGlow = small.outputIntents.find((intent) => intent.intentType === 'illumination');
+      const largeGlow = large.outputIntents.find((intent) => intent.intentType === 'illumination');
+      assert.equal(largeGlow.glowRadius, smallGlow.glowRadius * 2);
+    }
+  }
 });
 
 test('compiled Water dispersion and curtain components are consumed by mechanics', () => {

@@ -116,6 +116,7 @@ export function PromotedWaterDispersionEffect({
   showLabContext = true,
   effectId = 'lab',
   useInternalLight = true,
+  onLifecycleSettled,
 }) {
   const sheetRef = useRef(null);
   const innerRef = useRef(null);
@@ -124,6 +125,15 @@ export function PromotedWaterDispersionEffect({
   const contactMistRefs = useRef([]);
   const animationAccumulatorRef = useRef(0);
   const lifeRef = useRef({ phase: active ? 'starting' : 'idle', t: 0, endFront: 1 });
+  const settledNotifiedRef = useRef(!active);
+  useEffect(() => () => {
+    if (showLabContext || typeof window === 'undefined') return;
+    const entries = window.__WHA_MAIN_WATER_DISPERSIONS__ ?? {};
+    if (!(effectId in entries)) return;
+    const next = { ...entries };
+    delete next[effectId];
+    window.__WHA_MAIN_WATER_DISPERSIONS__ = next;
+  }, [effectId, showLabContext]);
 
   const signAngles = useMemo(
     () => signAnglesOverride?.length
@@ -192,6 +202,7 @@ export function PromotedWaterDispersionEffect({
   }, [axisU, axisV, sealRadius, signAngles, spellCenter]);
 
   useFrame((state, delta) => {
+    if (active) settledNotifiedRef.current = false;
     animationAccumulatorRef.current += Math.min(delta, 0.05);
     if (animationAccumulatorRef.current < 1 / (showLabContext ? 30 : 15)) return;
     const animationDelta = animationAccumulatorRef.current;
@@ -206,6 +217,10 @@ export function PromotedWaterDispersionEffect({
       }
       for (const mist of contactMistRefs.current) {
         if (mist) mist.visible = false;
+      }
+      if (!settledNotifiedRef.current) {
+        settledNotifiedRef.current = true;
+        onLifecycleSettled?.();
       }
       return;
     }
@@ -454,6 +469,7 @@ export function PromotedElementDispersionEffect({
   showLabContext = true,
   effectId = 'lab',
   useInternalLight = true,
+  onLifecycleSettled,
 }) {
   const visual = elementVisual(element);
   const sheetRef = useRef(null);
@@ -462,6 +478,15 @@ export function PromotedElementDispersionEffect({
   const streakRefs = useRef([]);
   const accumulatorRef = useRef(0);
   const lifeRef = useRef({ phase: active ? 'starting' : 'idle', t: 0, endFront: 1 });
+  const settledNotifiedRef = useRef(!active);
+  useEffect(() => () => {
+    if (showLabContext || typeof window === 'undefined') return;
+    const entries = window.__WHA_MAIN_ELEMENT_DISPERSIONS__ ?? {};
+    if (!(effectId in entries)) return;
+    const next = { ...entries };
+    delete next[effectId];
+    window.__WHA_MAIN_ELEMENT_DISPERSIONS__ = next;
+  }, [effectId, showLabContext]);
 
   const geometry = useMemo(() => createRingSheetGeometry(72, 16), []);
   // Fire renders through the shared flame shader (radial mode: hot at the seal,
@@ -501,6 +526,7 @@ export function PromotedElementDispersionEffect({
   const windStreaks = windDispersionStreakMetrics(reach);
 
   useFrame((state, delta) => {
+    if (active) settledNotifiedRef.current = false;
     accumulatorRef.current += Math.min(delta, 0.05);
     if (accumulatorRef.current < 1 / 30) return;
     const animationDelta = accumulatorRef.current;
@@ -515,6 +541,10 @@ export function PromotedElementDispersionEffect({
       hideDispersionChunks(chunkRefs.current);
       hideDispersionChunks(streakRefs.current);
       if (lightRef.current) lightRef.current.intensity = 0;
+      if (!settledNotifiedRef.current) {
+        settledNotifiedRef.current = true;
+        onLifecycleSettled?.();
+      }
       return;
     }
 

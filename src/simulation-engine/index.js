@@ -11,6 +11,22 @@ export const SIMULATION_ENGINE_VERSION = '0.1.0';
 // the same contract for its generated body so the visible orb, its collider,
 // and the circle that owns it cannot drift to different sizes.
 export const NORMALIZED_SPELL_CIRCLE_RADIUS = 1.2;
+// Both world Spellpads and mounted plates may be deliberately miniaturized.
+// Keep a nonzero safety floor for transform math without snapping either kind
+// back to the old presentation size.
+export const MIN_MOUNTED_SPELL_WORLD_SCALE = 0.025;
+const MIN_PLACED_SPELL_WORLD_SCALE = 0.05;
+// Physical readability floors begin tapering below this historical reference;
+// this is not a clamp on the authored placement scale.
+const STANDARD_MIN_SPELL_WORLD_SCALE = 0.25;
+
+function scaleStandardFloor(value, worldScale) {
+  return value * Math.min(
+    1,
+    Math.max(MIN_MOUNTED_SPELL_WORLD_SCALE, finite(worldScale, 1)) /
+      STANDARD_MIN_SPELL_WORLD_SCALE,
+  );
+}
 // The main-world paper spellpad is a square. Dispersion must clear its corners,
 // not merely the circular ink seal drawn inside it. Keep the authored note size
 // and the proportional corner clearance here so rendering and physics cannot
@@ -921,13 +937,19 @@ function normalizePlacementFrame(frame = {}) {
       : fallbackTangentForNormal(normal);
   const bitangent = normalizeSceneVector(crossVector(normal, tangent));
 
+  const placementMode = frame.placementMode ?? (frame.surfaceMode === 'ground' ? 'ground_plane' : 'surface');
+  const minimumWorldScale =
+    placementMode === 'mounted_surface' || frame.surfaceMode === 'mechanical_spell_plate'
+      ? MIN_MOUNTED_SPELL_WORLD_SCALE
+      : MIN_PLACED_SPELL_WORLD_SCALE;
+
   return {
     origin: normalizePosition(frame.origin, DEFAULT_PLACEMENT_FRAME.origin),
     normal,
     tangent,
     bitangent,
-    worldScale: clamp(finite(frame.worldScale, 1), 0.25, 4),
-    placementMode: frame.placementMode ?? (frame.surfaceMode === 'ground' ? 'ground_plane' : 'surface'),
+    worldScale: clamp(finite(frame.worldScale, 1), minimumWorldScale, 4),
+    placementMode,
     surfaceMode: frame.surfaceMode ?? null,
     surfaceTargetId: frame.surfaceTargetId ?? null,
     surfaceLabel: frame.surfaceLabel ?? null,
@@ -947,7 +969,7 @@ function fallbackTangentForNormal(normal) {
  * @param {{ x?: number; y?: number; z?: number }} local
  */
 function localToScene(frame, local) {
-  const worldScale = clamp(finite(frame.worldScale, 1), 0.25, 4);
+  const worldScale = clamp(finite(frame.worldScale, 1), MIN_MOUNTED_SPELL_WORLD_SCALE, 4);
   return addVector(
     frame.origin,
     addVector(
@@ -966,7 +988,7 @@ function localToScene(frame, local) {
  */
 function sceneToLocal(frame, scenePosition) {
   const delta = subtractVector(scenePosition, frame.origin);
-  const worldScale = clamp(finite(frame.worldScale, 1), 0.25, 4);
+  const worldScale = clamp(finite(frame.worldScale, 1), MIN_MOUNTED_SPELL_WORLD_SCALE, 4);
   return {
     x: dotVector(delta, frame.tangent) / worldScale,
     y: dotVector(delta, frame.bitangent) / worldScale,
@@ -2515,7 +2537,7 @@ function generatedDispersionBudget(args) {
 }
 
 function scaleGeneratedBudgetForPlacement(budget, worldScale) {
-  const scale = clamp(finite(worldScale, 1), 0.25, 4);
+  const scale = clamp(finite(worldScale, 1), MIN_MOUNTED_SPELL_WORLD_SCALE, 4);
   if (scale === 1) return { ...budget, worldScale: 1 };
   return {
     ...budget,
@@ -4117,7 +4139,7 @@ function buildIlluminationIntents(outputs, lifecycle) {
     .map((output) => {
       const worldScale = clamp(
         finite(output.worldScale ?? output.placementFrame?.worldScale, 1),
-        0.25,
+        MIN_MOUNTED_SPELL_WORLD_SCALE,
         4,
       );
       const signScale = Math.max(0.35, finite(output.signSizeScale, 1));
@@ -4129,7 +4151,11 @@ function buildIlluminationIntents(outputs, lifecycle) {
         output.sceneAxis ?? output.placementFrame?.normal ?? DEFAULT_PLACEMENT_FRAME.normal,
       );
       const radius = roundNumber(
-        clamp((isDispersion ? 0.48 : 0.28 + magnitude * 0.035) * worldScale, 0.16, 0.9),
+        clamp(
+          (isDispersion ? 0.48 : 0.28 + magnitude * 0.035) * worldScale,
+          scaleStandardFloor(0.16, worldScale),
+          0.9,
+        ),
         4,
       );
       const reach = roundNumber(
@@ -4137,9 +4163,13 @@ function buildIlluminationIntents(outputs, lifecycle) {
           (isDispersion
             ? 0.46 + 1.05 * signScale
             : 0.9 + magnitude * 0.34 * signScale) * worldScale,
-          0.7,
+          scaleStandardFloor(0.7, worldScale),
           5.5,
         ),
+        4,
+      );
+      const glowRadius = roundNumber(
+        NORMALIZED_SPELL_CIRCLE_RADIUS * worldScale * 1.15,
         4,
       );
       const intensity = roundNumber(
@@ -4158,6 +4188,8 @@ function buildIlluminationIntents(outputs, lifecycle) {
         direction,
         radius,
         reach,
+        glowRadius,
+        glowRadiusPolicy: 'one_point_one_five_times_owning_spell_circle_radius',
         color: '#fff0b0',
         intensity,
         falloff: 'inverse_square_bounded_local',
@@ -4478,7 +4510,7 @@ function physicsFieldForColumn(args) {
     light: { coefficient: 0, cap: 0 },
   }[args.materialKind];
   if (!strength) return null;
-  const worldScale = clamp(finite(args.worldScale, 1), 0.25, 4);
+  const worldScale = clamp(finite(args.worldScale, 1), MIN_MOUNTED_SPELL_WORLD_SCALE, 4);
   const displayMaxRadius = Math.max(120, finite(args.displayMaxRadius, args.thicknessRingRadius));
   const displayedRingRadius = Math.max(
     1.2,
@@ -4493,13 +4525,17 @@ function physicsFieldForColumn(args) {
       ) *
         finite(args.columnHeightMultiplier, COLUMN_HEIGHT_MULTIPLIER) *
         worldScale,
-      0.8,
+      scaleStandardFloor(0.8, worldScale),
       42,
     ),
     4,
   );
   const radius = roundNumber(
-    clamp(displayedRingRadius * finite(args.columnRadiusRatio, 0.7) * worldScale, 0.15, 3),
+    clamp(
+      displayedRingRadius * finite(args.columnRadiusRatio, 0.7) * worldScale,
+      scaleStandardFloor(0.15, worldScale),
+      3,
+    ),
     4,
   );
   return {
@@ -4556,7 +4592,11 @@ function physicsFieldForDispersion(args) {
     light: { coefficient: 0, cap: 0 },
   }[args.materialKind];
   if (!strength) return null;
-  const worldScale = clamp(finite(args.placementFrame?.worldScale, 1), 0.25, 4);
+  const worldScale = clamp(
+    finite(args.placementFrame?.worldScale, 1),
+    MIN_MOUNTED_SPELL_WORLD_SCALE,
+    4,
+  );
   const signScale = Math.max(0.35, finite(args.signSizeAverage, DEFAULT_SIGN_SIZE) / DEFAULT_SIGN_SIZE);
   const normal = normalizeSceneVector(args.placementFrame?.normal);
   const tangent = normalizeSceneVector(args.placementFrame?.tangent, { x: 1, y: 0, z: 0 });
@@ -4579,7 +4619,10 @@ function physicsFieldForDispersion(args) {
       Math.min(2.8, (0.46 + 1.05 * signScale) * worldScale),
       4,
     ),
-    halfThickness: roundNumber(Math.max(0.16, 0.24 * worldScale), 4),
+    halfThickness: roundNumber(
+      Math.max(scaleStandardFloor(0.16, worldScale), 0.24 * worldScale),
+      4,
+    ),
     signAngles: args.sourceAnchors.map(
       (anchor) => roundNumber((finite(anchor.positionAngleDeg, 0) * Math.PI) / 180, 6),
     ),
@@ -4631,6 +4674,11 @@ function physicsFieldForForceConstraint(args) {
       scaleVector(normal, Math.max(0.45, verticalLift / 180)),
       drift,
     );
+    const worldScale = clamp(
+      finite(args.placementFrame.worldScale, 1),
+      MIN_MOUNTED_SPELL_WORLD_SCALE,
+      4,
+    );
     return {
       active: args.active,
       fieldShape: 'generated_levitation_orb',
@@ -4638,14 +4686,14 @@ function physicsFieldForForceConstraint(args) {
       direction: normalizeSceneVector(launchVector),
       normal,
       radius: roundNumber(
-        NORMALIZED_SPELL_CIRCLE_RADIUS * clamp(
-          finite(args.placementFrame.worldScale, 1),
-          0.25,
-          4,
-        ),
+        NORMALIZED_SPELL_CIRCLE_RADIUS * worldScale,
         4,
       ),
-      hoverHeight: roundNumber(clamp(0.38 + (verticalLift / 180) * 0.24, 0.54, 1.12), 4),
+      hoverHeight: roundNumber(
+        clamp(0.38 + (verticalLift / 180) * 0.24, 0.54, 1.12) *
+          Math.min(1, worldScale / STANDARD_MIN_SPELL_WORLD_SCALE),
+        4,
+      ),
       launchSpeed: roundNumber(clamp(3.2 + driftMagnitude * 0.12 + verticalLift / 90, 3.2, 11), 4),
       oneShotLaunch: args.force.oneShotLaunch === true,
       motionMode: args.force.motionMode ?? null,

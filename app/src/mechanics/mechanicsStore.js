@@ -433,6 +433,13 @@ export const useMechanicsStore = create((set, get) => ({
   setAssemblyTransform(assemblyId, transform, history = true) {
     if (get().mode !== 'build') return;
     const document = get().document;
+    const scaleFactors = transform.scale
+      ? {
+          x: Math.max(0.05, Math.abs(Number(transform.scale.x ?? 1))),
+          y: Math.max(0.05, Math.abs(Number(transform.scale.y ?? 1))),
+          z: Math.max(0.05, Math.abs(Number(transform.scale.z ?? 1))),
+        }
+      : null;
     const next = {
       ...document,
       assemblies: document.assemblies.map((assembly) =>
@@ -460,6 +467,24 @@ export const useMechanicsStore = create((set, get) => ({
             })()
           : assembly,
       ),
+      spellDevices: scaleFactors
+        ? document.spellDevices.map((device) => {
+            if (device.assemblyId !== assemblyId) return device;
+            const plateScale = spellPlatePlaneScale(device.localFrame, scaleFactors);
+            return {
+              ...device,
+              localFrame: {
+                ...device.localFrame,
+                origin: {
+                  x: Number(device.localFrame?.origin?.x ?? 0) * scaleFactors.x,
+                  y: Number(device.localFrame?.origin?.y ?? 0) * scaleFactors.y,
+                  z: Number(device.localFrame?.origin?.z ?? 0) * scaleFactors.z,
+                },
+              },
+              plateRadius: Number(device.plateRadius ?? 0.42) * plateScale,
+            };
+          })
+        : document.spellDevices,
     };
     if (history) {
       commitDocument(set, get, next, 'Assembly transformed.', {
@@ -1313,6 +1338,22 @@ function commitDocument(set, get, document, status, options = {}) {
 
 function pushHistory(history, document) {
   return [...history, document].slice(-HISTORY_LIMIT);
+}
+
+function spellPlatePlaneScale(localFrame, scale) {
+  const normal = normalizeVector(localFrame?.normal ?? { x: 0, y: 0, z: 1 });
+  const tangent = normalizeVector(localFrame?.tangent ?? { x: 1, y: 0, z: 0 });
+  const bitangent = normalizeVector({
+    x: normal.y * tangent.z - normal.z * tangent.y,
+    y: normal.z * tangent.x - normal.x * tangent.z,
+    z: normal.x * tangent.y - normal.y * tangent.x,
+  });
+  const directionScale = (direction) => Math.hypot(
+    direction.x * scale.x,
+    direction.y * scale.y,
+    direction.z * scale.z,
+  );
+  return (directionScale(tangent) + directionScale(bitangent)) / 2;
 }
 
 function patchMechanicDocument(document, mechanicId, patch) {

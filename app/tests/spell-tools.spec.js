@@ -990,8 +990,9 @@ test('captured cursor continuously drives wrench gizmo resizing', async ({ page 
   await expect(hud).toBeVisible();
   await hud.getByRole('button', { name: 'Scale', exact: true }).click();
   await expect.poll(() => target.canvas.getAttribute('data-wrench-transform-operation')).toBe('scale');
-  const scaleX = hud.getByLabel('Scale X');
-  const before = Number(await scaleX.inputValue());
+  const scaleInputs = ['X', 'Y', 'Z'].map((axis) => hud.getByLabel(`Scale ${axis}`));
+  const readScale = () => Promise.all(scaleInputs.map(async (input) => Number(await input.inputValue())));
+  const before = await readScale();
 
   await expect.poll(() => page.evaluate(() => window.__WHA_PLAYER__?.inputEnabled)).toBe(true);
   await installPointerLockProbe(page);
@@ -999,29 +1000,42 @@ test('captured cursor continuously drives wrench gizmo resizing', async ({ page 
   await expect.poll(() => page.evaluate(() => window.__WHA_CAMERA_DEBUG__?.pointerLock?.locked)).toBe(true);
   await expect(page.getByTestId('captured-pointer-cursor')).toBeVisible();
   await expect.poll(() => page.evaluate(() => Boolean(window.__WHA_VIRTUAL_CURSOR__))).toBe(true);
-  const xHandle = await findWrenchGizmoHitRegion(page, 'X', true);
-  expect(xHandle).not.toBeNull();
-  await moveCapturedCursorToPoint(page, xHandle);
+  const uniformHandle = await findWrenchGizmoHitRegion(page, 'XYZ', true);
+  expect(uniformHandle).not.toBeNull();
+  await moveCapturedCursorToPoint(page, uniformHandle);
   await expect.poll(() => page.evaluate(() => ({ cursor: window.__WHA_VIRTUAL_CURSOR__ }))).toMatchObject({
     cursor: { target: '3D spell sandbox' },
   });
   await expect.poll(() => page.evaluate(() => window.__WHA_VIRTUAL_CURSOR__.forwardedMoves)).toBeGreaterThan(0);
-  await expect.poll(() => target.canvas.getAttribute('data-wrench-transform-axis')).toBe('X');
+  await expect.poll(() => target.canvas.getAttribute('data-wrench-transform-axis')).toBe('XYZ');
 
   await dispatchCapturedMouseDown(page);
-  await expect(target.canvas).toHaveAttribute('data-wrench-transform-latched-axis', 'X');
+  await expect(target.canvas).toHaveAttribute('data-wrench-transform-latched-axis', 'XYZ');
   await expect(target.canvas).toHaveAttribute('data-wrench-transform-dragging', 'true');
 
-  await page.evaluate(() => {
-    const cursor = window.__WHA_VIRTUAL_CURSOR__;
-    const movement = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
-    Object.defineProperty(movement, 'movementX', { value: 80 / (cursor.sensitivity ?? 1) });
-    Object.defineProperty(movement, 'movementY', { value: 0 });
-    document.dispatchEvent(movement);
-  });
+  await dispatchCapturedMovement(page, 50, -40);
   await dispatchCapturedMouseUp(page);
 
-  await expect.poll(async () => Number(await scaleX.inputValue())).not.toBe(before);
+  await expect.poll(readScale).not.toEqual(before);
+  const enlarged = await readScale();
+  for (let index = 0; index < enlarged.length; index += 1) {
+    expect(enlarged[index]).toBeGreaterThan(before[index]);
+    expect(enlarged[index] / before[index]).toBeCloseTo(enlarged[0] / before[0], 2);
+  }
+
+  const movedUniformHandle = await findWrenchGizmoHitRegion(page, 'XYZ', true);
+  expect(movedUniformHandle).not.toBeNull();
+  await moveCapturedCursorToPoint(page, movedUniformHandle);
+  await expect.poll(() => target.canvas.getAttribute('data-wrench-transform-axis')).toBe('XYZ');
+  await dispatchCapturedMouseDown(page);
+  await dispatchCapturedMovement(page, -50, 40);
+  await dispatchCapturedMouseUp(page);
+  await expect.poll(async () => (await readScale())[0]).toBeLessThan(enlarged[0]);
+  const reduced = await readScale();
+  for (let index = 0; index < reduced.length; index += 1) {
+    expect(reduced[index]).toBeLessThan(enlarged[index]);
+    expect(reduced[index] / enlarged[index]).toBeCloseTo(reduced[0] / enlarged[0], 2);
+  }
   await expect.poll(() => page.evaluate(() => window.__WHA_CAMERA_DEBUG__.pointerLock)).toMatchObject({
     locked: true,
     requested: 1,

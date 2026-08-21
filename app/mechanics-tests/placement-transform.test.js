@@ -7,7 +7,11 @@ import {
   validatePlacementTransformPatch,
 } from '../src/mechanics/placementTransforms.js';
 import { MainWorldRapierRuntime } from '../src/world-physics/MainWorldRapierRuntime.js';
-import { DEFAULT_PLACED_SPELL_SCALE, useSpellStore } from '../src/store.js';
+import {
+  DEFAULT_PLACED_SPELL_SCALE,
+  MIN_PLACED_SPELL_SCALE,
+  useSpellStore,
+} from '../src/store.js';
 import { createSpellMakerDraft } from '../../src/spell-maker/authoring.js';
 import { createDefaultSceneState } from '../../src/simulation-engine/index.js';
 import { rotateVector } from '../../src/mechanics-engine/index.js';
@@ -45,6 +49,81 @@ test('generic store action updates asset placement and rejects invalid input ato
   assert.equal(useSpellStore.getState().updatePlacementTransform({ kind: 'asset', id, scale: { x: Infinity } }), false);
   assert.deepEqual(useSpellStore.getState().placedAssets.find((item) => item.id === id).transform, before);
   useSpellStore.getState().removePlacedAsset(id);
+});
+
+test('placed Spellpad scale drives its circle, signs, and compiled output geometry', () => {
+  useSpellStore.setState({
+    spellTemplates: [],
+    selectedSpellTemplateId: null,
+    placedSpells: [],
+    selectedPlacedSpellId: null,
+    nextSpellTemplateIndex: 1,
+    nextPlacedSpellIndex: 1,
+    worldHistoryPast: [],
+    worldHistoryFuture: [],
+    worldEditTransaction: null,
+  });
+  const draft = createSpellMakerDraft();
+  draft.name = 'Spellpad scale contract';
+  assert.equal(useSpellStore.getState().saveAuthoredSpell(draft).ok, true);
+  const spellId = useSpellStore.getState().placeSelectedSpell({
+    point: { x: 0, y: 0, z: 0 },
+    normal: { x: 0, y: 1, z: 0 },
+  });
+  const outputFor = () => useSpellStore.getState().placedSpells
+    .find((spell) => spell.id === spellId)
+    .runtimeResult.intents.find((intent) =>
+      ['water_column', 'material_column'].includes(intent.intentType),
+    );
+  const baseOutput = outputFor();
+
+  useSpellStore.getState().updatePlacedSpellTransform(spellId, {
+    scale: MIN_PLACED_SPELL_SCALE,
+  });
+  let spell = useSpellStore.getState().placedSpells.find((item) => item.id === spellId);
+  let circle = spell.runtimeResult.intents.find(
+    (intent) => intent.intentType === 'spell_circle_render_data',
+  );
+  let output = outputFor();
+  const smallerRatio = MIN_PLACED_SPELL_SCALE / DEFAULT_PLACED_SPELL_SCALE;
+
+  assert.deepEqual(spell.placementTransform.scale, {
+    x: MIN_PLACED_SPELL_SCALE,
+    y: MIN_PLACED_SPELL_SCALE,
+    z: MIN_PLACED_SPELL_SCALE,
+  });
+  assert.ok(
+    Math.abs(circle.placementFrame.worldScale - MIN_PLACED_SPELL_SCALE) < 1e-9,
+  );
+  assert.equal(
+    output.physicsField.length,
+    Number((baseOutput.physicsField.length * smallerRatio).toFixed(4)),
+  );
+  assert.equal(
+    output.physicsField.radius,
+    Number((baseOutput.physicsField.radius * smallerRatio).toFixed(4)),
+  );
+
+  assert.equal(useSpellStore.getState().updatePlacementTransform({
+    kind: 'spell',
+    id: spellId,
+    scale: 0.4,
+  }), true);
+  spell = useSpellStore.getState().placedSpells.find((item) => item.id === spellId);
+  circle = spell.runtimeResult.intents.find(
+    (intent) => intent.intentType === 'spell_circle_render_data',
+  );
+  output = outputFor();
+  const largerRatio = 0.4 / DEFAULT_PLACED_SPELL_SCALE;
+  assert.ok(Math.abs(circle.placementFrame.worldScale - 0.4) < 1e-9);
+  assert.equal(
+    output.physicsField.length,
+    Number((baseOutput.physicsField.length * largerRatio).toFixed(4)),
+  );
+  assert.equal(
+    output.physicsField.radius,
+    Number((baseOutput.physicsField.radius * largerRatio).toFixed(4)),
+  );
 });
 
 test('every yard practice block uses the shared wrench prop contract without an asset-library entry', async () => {

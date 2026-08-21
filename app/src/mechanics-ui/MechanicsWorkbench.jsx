@@ -232,17 +232,14 @@ export default function MechanicsWorkbench({ onReturnToAtelier, editBlueprintId 
         <div className="mechanics-top-actions">
           <button type="button" onClick={() => store.setDialog('starter')}>Examples</button>
           {editingBlueprint ? (
-            <>
-              <button
-                type="button"
-                className="mechanics-save-changes"
-                disabled={!hasUnsavedBlueprintChanges}
-                onClick={store.overwriteBlueprint}
-              >
-                Save changes
-              </button>
-              <button type="button" onClick={() => store.setDialog('blueprints')}>Save as new</button>
-            </>
+            <button
+              type="button"
+              className="mechanics-save-changes"
+              disabled={!hasUnsavedBlueprintChanges}
+              onClick={store.overwriteBlueprint}
+            >
+              Save changes
+            </button>
           ) : null}
           <button type="button" onClick={() => store.setDialog('blueprints')}>Save / load</button>
           {onReturnToAtelier ? (

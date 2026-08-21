@@ -52,7 +52,7 @@ test('hotbar exposes the six tools and reserves later slots', async ({ page }) =
   await expect(page.getByTestId('tool-status')).toContainText('Empty inventory slot selected');
 });
 
-test('Mechanics Library edits a saved build in the workshop and supports overwrite or save as new', async ({ page }) => {
+test('Mechanics Library edits a saved build and exposes save as new through Save / load', async ({ page }) => {
   test.setTimeout(120_000);
   const originalDocument = createPressurePlateDocument();
   originalDocument.assemblies[0].editor.opacity = 0.35;
@@ -92,7 +92,8 @@ test('Mechanics Library edits a saved build in the workshop and supports overwri
   await expect(page.getByTestId('mechanics-status')).toContainText('updated in the Mechanics Library');
 
   await page.getByTestId('mechanics-add-sphere').click();
-  await page.getByRole('button', { name: 'Save as new', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Save as new', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Save / load', exact: true }).click();
   const blueprints = page.getByRole('dialog', { name: 'Personal blueprints' });
   await expect(blueprints.getByLabel('Blueprint name')).toHaveValue('Library machine copy');
   await blueprints.getByLabel('Blueprint name').fill('Library machine variation');
@@ -185,7 +186,7 @@ test('placed mechanics render their real Sim Light output instead of a field pla
       transform: {
         position: { x: 5, y: 0, z: 3 },
         rotation: { x: 0, y: 0, z: 0, w: 1 },
-        scale: { x: 1, y: 1, z: 1 },
+        scale: { x: 0.1, y: 0.1, z: 0.1 },
       },
     }]));
   }, { pressureDocument: document });
@@ -208,6 +209,21 @@ test('placed mechanics render their real Sim Light output instead of a field pla
     )),
     { timeout: 20_000 },
   ).toMatchObject({ materialKind: 'light', active: true, owner: 'main-mechanics' });
+  const scaled = await page.evaluate(() => {
+    const device = window.__WHA_MAIN_WORLD_PHYSICS__?.blueprint?.spellDevices?.[0];
+    const illumination = device?.outputIntents?.find((intent) => intent.intentType === 'illumination');
+    const rendered = window.__WHA_LOCAL_ILLUMINATION__?.emitters?.find(
+      (emitter) => emitter.owner === 'main-mechanics',
+    );
+    return {
+      worldScale: device?.frame?.worldScale,
+      intentGlowRadius: illumination?.glowRadius,
+      renderedGlowRadius: rendered?.glowRadius,
+    };
+  });
+  expect(scaled.worldScale).toBeCloseTo(0.055, 6);
+  expect(scaled.intentGlowRadius).toBeCloseTo(0.055 * 1.2 * 1.15, 4);
+  expect(scaled.renderedGlowRadius).toBeCloseTo(scaled.intentGlowRadius, 3);
 });
 
 test('held-item panel shows both mouse actions for every equipped tool', async ({ page }) => {

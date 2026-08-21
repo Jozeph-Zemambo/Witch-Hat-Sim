@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { join } from 'node:path';
 
-const SCREENSHOT_DIR = '/Users/jozeph.kimambo/Documents/Actually Projects/Fabling Codex/runs/witch-hat-sim-gamified-experience--01/08-build-pressure-plate-machine/screenshots';
+const SCREENSHOT_DIR = join(
+  process.env.FABLING_RUNS ?? '/tmp',
+  '08-build-pressure-plate-machine',
+  'screenshots',
+);
 
 async function loadPressurePlate(page) {
   await page.goto('/mechanics');

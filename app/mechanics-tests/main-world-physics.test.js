@@ -1326,6 +1326,35 @@ test('scaled pressure builds retain their assembled profile and load response', 
   }
 });
 
+test('tiny placed mechanics builds carry their scale into mounted spell output and Light glow', () => {
+  const snapshotAtScale = (scale) => {
+    const runtime = new MainWorldRapierRuntime(R, {
+      placedMechanicsBuilds: [{
+        id: `placed-mechanics:light-scale-${scale}`,
+        document: createPressurePlateDocument(),
+        transform: { scale: { x: scale, y: scale, z: scale } },
+      }],
+    });
+    const snapshot = runtime.getSnapshot();
+    runtime.dispose();
+    return snapshot;
+  };
+  const tiny = snapshotAtScale(0.1).blueprint.spellDevices[0];
+  const full = snapshotAtScale(1).blueprint.spellDevices[0];
+  const tinyColumn = tiny.outputIntents.find((intent) => intent.intentType === 'material_column');
+  const fullColumn = full.outputIntents.find((intent) => intent.intentType === 'material_column');
+  const tinyIllumination = tiny.outputIntents.find((intent) => intent.intentType === 'illumination');
+
+  assert.ok(Math.abs(tiny.frame.worldScale - full.frame.worldScale * 0.1) < 1e-12);
+  assert.equal(tinyColumn.worldScale, tiny.frame.worldScale);
+  assert.equal(tinyColumn.physicsField.length, Number((fullColumn.physicsField.length * 0.1).toFixed(4)));
+  assert.equal(tinyColumn.physicsField.radius, Number((fullColumn.physicsField.radius * 0.1).toFixed(4)));
+  assert.equal(
+    tinyIllumination.glowRadius,
+    Number((NORMALIZED_SPELL_CIRCLE_RADIUS * tiny.frame.worldScale * 1.15).toFixed(4)),
+  );
+});
+
 test('loaded catapult projectile settles then wakes from the main-world physicsField, while continuous drive persists', () => {
   const source = readFileSync(new URL('../src/world-physics/MainWorldRapierRuntime.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /\b(?:elapsedSeconds|stepCount)\b[^\n]*\.sleep\s*\(/);

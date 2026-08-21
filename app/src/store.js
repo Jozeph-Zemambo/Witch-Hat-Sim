@@ -34,7 +34,7 @@ const DEFAULT_ACTIVATION_DURATION_MS = 5000;
 const MIN_PLACED_SPELL_DURATION_MS = 250;
 const MAX_PLACED_SPELL_DURATION_MS = 300_000;
 export const DEFAULT_PLACED_SPELL_SCALE = 0.2;
-export const MIN_PLACED_SPELL_SCALE = DEFAULT_PLACED_SPELL_SCALE;
+export const MIN_PLACED_SPELL_SCALE = 0.05;
 const MAX_PLACED_SPELL_SCALE = 4;
 const MAX_PLACED_SPELL_TILT_DEG = 85;
 const DEFAULT_SPELL_RING_WORLD_RADIUS = 2.25;
@@ -2091,20 +2091,32 @@ export const useSpellStore = create((set, get) => ({
     set((state) => withWorldHistory(state, {
       placedSpells: state.placedSpells.map((spell) => {
         if (spell.id !== placedSpellId) return spell;
+        const nextScale = patch.scale == null
+          ? null
+          : clampNumber(
+              patch.scale,
+              MIN_PLACED_SPELL_SCALE,
+              MAX_PLACED_SPELL_SCALE,
+              spell.transform.scale,
+            );
         return {
           ...spell,
+          // New placements use placementTransform as the authoritative world
+          // frame. Keep the legacy Spell Manager action synchronized so its
+          // scale changes the rendered circle, signs, and compiled output too.
+          ...(nextScale == null || !spell.placementTransform
+            ? {}
+            : {
+                placementTransform: {
+                  ...spell.placementTransform,
+                  scale: { x: nextScale, y: nextScale, z: nextScale },
+                },
+              }),
           transform: {
             ...spell.transform,
-            ...(patch.scale == null
+            ...(nextScale == null
               ? {}
-              : {
-                  scale: clampNumber(
-                    patch.scale,
-                    MIN_PLACED_SPELL_SCALE,
-                    MAX_PLACED_SPELL_SCALE,
-                    spell.transform.scale,
-                  ),
-                }),
+              : { scale: nextScale }),
             ...(patch.pitchDeg == null
               ? {}
               : {

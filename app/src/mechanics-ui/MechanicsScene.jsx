@@ -24,6 +24,7 @@ import { RapierMechanicsWorld } from '../mechanics/RapierMechanicsWorld.js';
 import { evaluateMountedSpellDevices } from '../mechanics/spell-device-system.js';
 import {
   emphasizeUniformScaleHandle,
+  installDirectionalUniformScale,
   installTransformAxisLatch,
 } from '../mechanics/transformControlInteraction.js';
 import { SimSpellOutputPresentation } from '../scene/ThreeScene.jsx';
@@ -980,6 +981,7 @@ function TransformGizmo({ objectRef, mode, onCommit, onDragState, minimumY = 0.0
     controls.setScaleSnap(0.1);
     controls.setSize(0.72);
     emphasizeUniformScaleHandle(controls);
+    const removeDirectionalUniformScale = installDirectionalUniformScale(controls, gl.domElement);
     controls.attach(object);
     scene.add(controls.getHelper());
     const syncPointerFeedback = () => {
@@ -1075,6 +1077,7 @@ function TransformGizmo({ objectRef, mode, onCommit, onDragState, minimumY = 0.0
     return () => {
       if (controls.dragging) onDragStateRef.current(false);
       removeAxisLatch();
+      removeDirectionalUniformScale();
       gl.domElement.removeEventListener('pointerdown', handleModifierPointerDown, true);
       gl.domElement.removeEventListener('pointerup', restoreBaseMode);
       gl.domElement.removeEventListener('pointercancel', restoreBaseMode);

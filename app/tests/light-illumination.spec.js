@@ -76,6 +76,10 @@ test('main-world Light illuminates nearby surfaces with bounded spatial falloff 
   expect(activeDay.emitters[0].materialKind).toBe('light');
   expect(activeDay.emitters[0].normal).toEqual(expect.objectContaining({ x: 0, y: 1, z: 0 }));
   expect(activeDay.emitters[0].origin.y).toBeGreaterThanOrEqual(0);
+  expect(activeDay.emitters[0].glowRadius).toBeCloseTo(
+    activeDay.emitters[0].worldScale * 1.2 * 1.15,
+    4,
+  );
   expect(activeDay.emitters[0].neighboringSurfaceSamples.near)
     .toBeGreaterThan(activeDay.emitters[0].neighboringSurfaceSamples.edge);
   await testInfo.attach('light-active-day-debug', {

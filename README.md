@@ -2,6 +2,8 @@
 
 Unofficial fan project with a working **compiler-core prototype**, render-neutral simulation engine, and browser spell simulator for *Witch Hat Atelier*–style spell JSON. The repo ships normative docs under [`spec/`](spec/), compiler implementation under [`src/compiler/`](src/compiler/), runtime semantics under [`src/simulation-engine/`](src/simulation-engine/), a Vite/React/Three.js app under [`app/`](app/), and automated tests under [`test/`](test/) with JSON fixtures in [`test/fixtures/`](test/fixtures/). The prototype imports Spell Maker–style JSON, normalizes geometry, resolves symbols, evaluates conservative rules, emits a deterministic effect graph with diagnostics, and maps that graph into runtime intents for a small magical practice field.
 
+New contributors should start with [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## Normal player flow
 
 Open `/` and choose **Play**, acknowledge the fan-project notice, then begin outside the Atelier doorway in first person. During the tutorial, walk inside and collect the physical Spellpad from the detailed back-wall writing desk; until then, Spellpad authoring and workshop entry remain locked. Skipping the tutorial grants the Spellpad immediately from the same spawn. The hotbar keeps Spellpad, Spell Manager, Wrench, Asset Manager, Weather Manager, and Mechanics Library available; number keys 1–6 select them and Escape closes their dialogs. Spellpad creates and edits native structured spells, right-click places the selected spell, and Spell Manager changes activation mode or activates a placed copy. Asset Manager places shapes, nature props, and decorative water basins; Weather Manager controls day/dusk/night and clear/rain; and Wrench provides precise transform, physics, and confirmed-removal controls.
@@ -56,7 +58,7 @@ npm run dev -- --port 5173 --strictPort
 
 ## Cloudflare deployment
 
-The repository includes an assets-only Worker configuration with SPA fallback, so direct links such as `/mechanics` resolve through the application.
+The repository includes an assets-only Worker configuration with SPA fallback, so direct links such as `/mechanics` resolve through the application. The workspace layout lets a fresh checkout install every dependency with one `npm ci`.
 
 ```bash
 npx wrangler login
@@ -64,6 +66,8 @@ npm run deploy:cloudflare
 ```
 
 `deploy:cloudflare` creates a fresh Vite production build before uploading `app/dist`. No runtime environment variables are required.
+
+For automatic deployments, connect the GitHub repository to the existing Worker with **Workers Builds**. Use `main` as the production branch, `npm run build:app` as the build command, and `npx wrangler@4.125.0 deploy` as the deploy command. Cloudflare then builds every pushed commit and creates preview versions for non-production branches.
 
 **Pipeline:** `compileSpell(input)` runs import → registry → geometry → rules → effect graph.
 
@@ -90,3 +94,7 @@ Compiler prototype: run `npm test` for the full validation suite (revamp v2 expa
 ## Fan-project notice
 
 This is an unofficial fan project and is not affiliated with, endorsed by, or sponsored by the *Witch Hat Atelier* rights holders.
+
+## License
+
+The project source is released under the [GNU General Public License v3.0](LICENSE). Third-party software and music retain their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
