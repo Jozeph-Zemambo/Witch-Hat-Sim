@@ -48,10 +48,42 @@ export function blueprintAppearanceRestored(savedDocument, loadedDocument) {
     === inspectBlueprintAppearance(loadedDocument).fingerprint;
 }
 
+/**
+ * Return the document representation used by a blueprint save or JSON export.
+ * Editor appearance is deliberately excluded when requested; the mechanics
+ * loader then supplies its normal full-opacity, non-click-through defaults.
+ * Always clone before stripping so exporting cannot alter the live workbench.
+ */
+export function serializeBlueprintDocument(document, includeAppearance = true) {
+  const serialized = clone(document);
+  if (includeAppearance !== false || !serialized || typeof serialized !== 'object') {
+    return serialized;
+  }
+
+  serialized.assemblies = stripEditorFields(serialized.assemblies);
+  for (const [collection] of RELATIONSHIP_COLLECTIONS) {
+    serialized[collection] = stripEditorFields(serialized[collection]);
+  }
+  return serialized;
+}
+
 function editorOpacity(item) {
   const value = Number(item?.editor?.opacity ?? 1);
   if (!Number.isFinite(value)) return 1;
   return Math.min(1, Math.max(0.05, value));
+}
+
+function stripEditorFields(items) {
+  if (!Array.isArray(items)) return items;
+  return items.map((item) => {
+    if (!item || typeof item !== 'object') return item;
+    const { editor: _editor, ...withoutEditor } = item;
+    return withoutEditor;
+  });
+}
+
+function clone(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
 function pluralize(count, singular, plural) {

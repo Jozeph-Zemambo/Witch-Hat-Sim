@@ -46,6 +46,7 @@ import { mountedSpellSnapshot } from './spell-device-system.js';
 import {
   blueprintAppearanceRestored,
   blueprintAppearanceSummary,
+  serializeBlueprintDocument,
 } from './blueprintAppearance.js';
 
 const STORAGE_KEY = 'wha-mechanics-workbench-v1';
@@ -1169,33 +1170,37 @@ export const useMechanicsStore = create((set, get) => ({
     });
   },
 
-  saveBlueprint(name) {
+  saveBlueprint(name, includeAppearance = true) {
     const trimmed = String(name ?? '').trim();
     if (!trimmed) return false;
     const record = {
       blueprintId: nextBlueprintId(get().blueprints),
       name: trimmed,
-      document: get().document,
+      document: serializeBlueprintDocument(get().document, includeAppearance),
     };
     set((state) => ({
       blueprints: [...state.blueprints, record],
-      status: `${trimmed} saved to this browser. Appearance check: ${blueprintAppearanceSummary(record.document)}.`,
+      status: includeAppearance === false
+        ? `${trimmed} saved to this browser. Editor appearance omitted.`
+        : `${trimmed} saved to this browser. Appearance check: ${blueprintAppearanceSummary(record.document)}.`,
     }));
     return record.blueprintId;
   },
 
-  saveBlueprintAsNew(name) {
+  saveBlueprintAsNew(name, includeAppearance = true) {
     const source = get().blueprints.find((item) => item.blueprintId === get().editingBlueprintId);
     const trimmed = String(name ?? '').trim();
     if (!trimmed) return false;
     const record = {
       blueprintId: nextBlueprintId(get().blueprints),
       name: trimmed,
-      document: get().document,
+      document: serializeBlueprintDocument(get().document, includeAppearance),
     };
     set((state) => ({
       blueprints: [...state.blueprints, record],
-      status: `${trimmed} saved as a new blueprint with its current opacity settings. ${source?.name ?? 'The original'} was not changed.`,
+      status: includeAppearance === false
+        ? `${trimmed} saved as a new blueprint without editor appearance settings. ${source?.name ?? 'The original'} was not changed.`
+        : `${trimmed} saved as a new blueprint with its current opacity settings. ${source?.name ?? 'The original'} was not changed.`,
       dialog: null,
       editingBlueprintId: record.blueprintId,
       editingBlueprintBaseline: state.document,
@@ -1203,18 +1208,21 @@ export const useMechanicsStore = create((set, get) => ({
     return record.blueprintId;
   },
 
-  overwriteBlueprint() {
+  overwriteBlueprint(includeAppearance = true) {
     const state = get();
     const blueprint = state.blueprints.find((item) => item.blueprintId === state.editingBlueprintId);
     if (!blueprint) return false;
+    const savedDocument = serializeBlueprintDocument(state.document, includeAppearance);
     set({
       blueprints: state.blueprints.map((item) => (
         item.blueprintId === blueprint.blueprintId
-          ? { ...item, document: state.document }
+          ? { ...item, document: savedDocument }
           : item
       )),
       editingBlueprintBaseline: state.document,
-      status: `${blueprint.name} updated in the Mechanics Library. Appearance check: ${blueprintAppearanceSummary(state.document)}.`,
+      status: includeAppearance === false
+        ? `${blueprint.name} updated in the Mechanics Library without editor appearance settings.`
+        : `${blueprint.name} updated in the Mechanics Library. Appearance check: ${blueprintAppearanceSummary(state.document)}.`,
     });
     return true;
   },

@@ -954,56 +954,49 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: flex-start;
-}
-
-.mechanics-json-heading h3,
-.mechanics-json-heading p {
-  margin: 0;
+  align-items: center;
 }
 
 .mechanics-json-heading h3 {
+  margin: 0;
   color: var(--mechanics-green-dark);
   font-size: 0.9rem;
 }
 
-.mechanics-json-heading p,
-.mechanics-json-actions span {
-  color: #68766e;
-  font-size: 0.7rem;
-  line-height: 1.35;
+.mechanics-json-heading-actions {
+  display: flex;
+  gap: 6px;
 }
 
-.mechanics-json-heading p {
-  margin-top: 3px;
-}
-
-.mechanics-json-heading button {
+.mechanics-json-heading-actions button {
   min-height: 31px;
   padding: 0 8px;
   font-size: 0.7rem;
   white-space: nowrap;
 }
 
-.mechanics-json-field {
-  display: grid;
-  gap: 5px;
-  color: #46574e;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.mechanics-json-field textarea {
-  min-height: 196px;
-  resize: vertical;
+.mechanics-json-panel > textarea {
+  width: 100%;
+  height: 46px;
+  min-height: 46px;
+  padding: 7px 9px;
+  resize: none;
   border: 1px solid #bdb292;
   border-radius: 5px;
+  color: var(--mechanics-ink);
+  background: #fffef9;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 0.68rem;
   font-weight: 400;
   line-height: 1.45;
   tab-size: 2;
   white-space: pre;
+}
+
+.mechanics-json-panel > textarea.expanded {
+  height: 196px;
+  min-height: 196px;
+  resize: vertical;
 }
 
 .mechanics-json-actions {
@@ -1529,22 +1522,29 @@
   line-height: 1.4;
 }
 
-.mechanics-appearance-check {
-  display: grid;
-  gap: 3px;
-  margin-bottom: 14px;
-  padding: 9px 10px;
-  border: 1px solid #b9cdbd;
-  border-left: 3px solid var(--mechanics-green);
-  border-radius: 6px;
-  color: #30483a;
-  background: #edf5ee;
-  font-size: 0.76rem;
-  line-height: 1.35;
+.mechanics-form .mechanics-save-appearance-option {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  font-weight: 600;
 }
 
-.mechanics-appearance-check strong {
-  color: var(--mechanics-green-dark);
+.mechanics-save-appearance-option input {
+  width: 17px;
+  min-height: 17px;
+  margin: 0;
+}
+
+.mechanics-save-appearance-option span {
+  display: grid;
+  gap: 1px;
+}
+
+.mechanics-save-appearance-option small {
+  color: #6b776f;
+  font-size: 0.66rem;
+  font-weight: 400;
 }
 
 .mechanics-blueprint-layout {

@@ -107,8 +107,8 @@ export default function MechanicsWorkbench({ onReturnToAtelier, editBlueprintId 
   const hasUnsavedBlueprintChanges = Boolean(
     editingBlueprint && editingBlueprintBaseline && document !== editingBlueprintBaseline,
   );
-  const saveBlueprintAsNew = (name) => {
-    const blueprintId = store.saveBlueprintAsNew(name);
+  const saveBlueprintAsNew = (name, includeAppearance) => {
+    const blueprintId = store.saveBlueprintAsNew(name, includeAppearance);
     if (!blueprintId || typeof window === 'undefined') return blueprintId;
     const url = new URL(window.location.href);
     url.searchParams.set('editBlueprint', blueprintId);

@@ -1,7 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { MECHANICS_STARTERS } from '../mechanics/starterDocuments.js';
 import SpellMakerForm from '../spell-maker/SpellMakerForm.jsx';
-import { blueprintAppearanceSummary } from '../mechanics/blueprintAppearance.js';
+import {
+  blueprintAppearanceSummary,
+  serializeBlueprintDocument,
+} from '../mechanics/blueprintAppearance.js';
 import { degreesToRadians } from './angleUnits.js';
 
 export function MechanicsModal({ title, description, onClose, children, className = '' }) {
@@ -662,6 +665,8 @@ export function BlueprintDialog({
   const [name, setName] = useState(defaultName ?? document.metadata?.name ?? 'My contraption');
   const [jsonText, setJsonText] = useState(() => formatDocumentJson(document));
   const [jsonError, setJsonError] = useState('');
+  const [jsonExpanded, setJsonExpanded] = useState(false);
+  const [includeAppearance, setIncludeAppearance] = useState(true);
 
   useEffect(() => {
     setJsonText(formatDocumentJson(document));
@@ -697,10 +702,6 @@ export function BlueprintDialog({
       onClose={onClose}
       className="wide"
     >
-      <div className="mechanics-appearance-check" data-testid="mechanics-appearance-check">
-        <strong><span aria-hidden="true">✓</span> Current appearance included</strong>
-        <span>{blueprintAppearanceSummary(document)}. Saving keeps these opacity settings; loading restores them.</span>
-      </div>
       <form
         className="mechanics-json-panel"
         onSubmit={(event) => {
@@ -709,41 +710,46 @@ export function BlueprintDialog({
         }}
       >
         <div className="mechanics-json-heading">
-          <div>
-            <h3>Assembly JSON</h3>
-            <p>Paste or edit a complete mechanics document, then load it into the workbench.</p>
+          <h3 id="mechanics-json-title">Assembly JSON</h3>
+          <div className="mechanics-json-heading-actions">
+            <button
+              type="button"
+              aria-expanded={jsonExpanded}
+              aria-controls="mechanics-assembly-json"
+              onClick={() => setJsonExpanded((expanded) => !expanded)}
+            >
+              {jsonExpanded ? 'Collapse JSON' : 'Expand JSON'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setJsonText(formatDocumentJson(document));
+                setJsonError('');
+              }}
+            >
+              Reset
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setJsonText(formatDocumentJson(document));
-              setJsonError('');
-            }}
-          >
-            Reset to current
-          </button>
         </div>
-        <label className="mechanics-json-field" htmlFor="mechanics-assembly-json">
-          Assembly JSON
-          <textarea
-            id="mechanics-assembly-json"
-            data-testid="mechanics-assembly-json"
-            value={jsonText}
-            onChange={(event) => {
-              setJsonText(event.target.value);
-              if (jsonError) setJsonError('');
-            }}
-            rows={12}
-            spellCheck="false"
-            autoComplete="off"
-            aria-describedby={jsonError ? 'mechanics-json-help mechanics-json-error' : 'mechanics-json-help'}
-          />
-        </label>
+        <textarea
+          id="mechanics-assembly-json"
+          className={jsonExpanded ? 'expanded' : ''}
+          data-testid="mechanics-assembly-json"
+          value={jsonText}
+          onChange={(event) => {
+            setJsonText(event.target.value);
+            if (jsonError) setJsonError('');
+          }}
+          rows={jsonExpanded ? 12 : 2}
+          spellCheck="false"
+          autoComplete="off"
+          aria-labelledby="mechanics-json-title"
+          aria-describedby={jsonError ? 'mechanics-json-error' : undefined}
+        />
         <div className="mechanics-json-actions">
           <button type="submit" className="mechanics-primary" data-testid="mechanics-apply-json">
             Load / apply JSON
           </button>
-          <span id="mechanics-json-help">Valid JSON replaces the current build as one undoable action.</span>
         </div>
         {jsonError ? <p id="mechanics-json-error" className="mechanics-error" role="alert">{jsonError}</p> : null}
       </form>
@@ -752,15 +758,30 @@ export function BlueprintDialog({
           className="mechanics-form"
           onSubmit={(event) => {
             event.preventDefault();
-            if (onSave(name)) setName('');
+            if (onSave(name, includeAppearance)) setName('');
           }}
         >
           <label>
             Blueprint name
             <input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
+          <label className="mechanics-save-appearance-option">
+            <input
+              type="checkbox"
+              checked={includeAppearance}
+              onChange={(event) => setIncludeAppearance(event.target.checked)}
+            />
+            <span>
+              Include editor appearance
+              <small>Opacity and click-through</small>
+            </span>
+          </label>
           <button type="submit" className="mechanics-primary">{saveLabel}</button>
-          <button type="button" data-testid="mechanics-export-json" onClick={() => downloadDocument(document)}>
+          <button
+            type="button"
+            data-testid="mechanics-export-json"
+            onClick={() => downloadDocument(serializeBlueprintDocument(document, includeAppearance))}
+          >
             Export JSON file
           </button>
           <label className="mechanics-file-button" data-testid="mechanics-import-json">

@@ -91,6 +91,25 @@ test('saved blueprints support edit, overwrite, and save-as-new without changing
   useMechanicsStore.getState().deleteBlueprint(blueprintId);
 });
 
+test('blueprint saves can omit editor appearance without changing the live build', () => {
+  useMechanicsStore.getState().loadStarter('blank');
+  useMechanicsStore.getState().addPrimitive('cuboid');
+  useMechanicsStore.getState().setAssemblyEditorOptions('assembly:1', {
+    opacity: 0.35,
+    clickThrough: true,
+  });
+  const liveDocument = useMechanicsStore.getState().document;
+
+  const blueprintId = useMechanicsStore.getState().saveBlueprint('Portable machine', false);
+  const saved = useMechanicsStore.getState().blueprints.find((item) => item.blueprintId === blueprintId);
+  assert.equal(saved.document.assemblies[0].editor, undefined);
+  assert.equal(liveDocument.assemblies[0].editor.opacity, 0.35);
+  assert.equal(liveDocument.assemblies[0].editor.clickThrough, true);
+  assert.equal(useMechanicsStore.getState().document, liveDocument);
+
+  useMechanicsStore.getState().deleteBlueprint(blueprintId);
+});
+
 test('assembly document JSON round-trips and invalid replacements keep the current build', () => {
   useMechanicsStore.getState().loadStarter('catapult');
   const source = structuredClone(useMechanicsStore.getState().document);

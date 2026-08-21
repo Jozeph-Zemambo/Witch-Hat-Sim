@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { createPressurePlateDocument } from '../src/mechanics/starterDocuments.js';
 
@@ -114,6 +115,16 @@ test('Mechanics Save / load round-trips editable assembly JSON and keeps malform
   await page.getByRole('button', { name: 'Save / load', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Personal blueprints' });
   const json = dialog.getByTestId('mechanics-assembly-json');
+  await expect(dialog.getByText('Assembly JSON', { exact: true })).toHaveCount(1);
+  const expandJson = dialog.getByRole('button', { name: 'Expand JSON', exact: true });
+  await expect(expandJson).toHaveAttribute('aria-expanded', 'false');
+  const collapsedHeight = await json.evaluate((element) => element.getBoundingClientRect().height);
+  await expandJson.click();
+  const collapseJson = dialog.getByRole('button', { name: 'Collapse JSON', exact: true });
+  await expect(collapseJson).toHaveAttribute('aria-expanded', 'true');
+  const expandedHeight = await json.evaluate((element) => element.getBoundingClientRect().height);
+  expect(expandedHeight).toBeGreaterThan(collapsedHeight * 3);
+  await collapseJson.click();
   const current = JSON.parse(await json.inputValue());
   expect(current.schemaVersion).toBeGreaterThan(0);
   expect(current.assemblies.length).toBeGreaterThan(0);
@@ -134,10 +145,15 @@ test('Mechanics Save / load round-trips editable assembly JSON and keeps malform
 
   await page.getByRole('button', { name: 'Save / load', exact: true }).click();
   const reloadedDialog = page.getByRole('dialog', { name: 'Personal blueprints' });
+  const appearanceToggle = reloadedDialog.getByRole('checkbox', { name: /Include editor appearance/ });
+  await expect(appearanceToggle).toBeChecked();
+  await appearanceToggle.uncheck();
   const downloadPromise = page.waitForEvent('download');
   await reloadedDialog.getByTestId('mechanics-export-json').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/\.json$/);
+  const exported = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(exported.assemblies.every((assembly) => assembly.editor == null)).toBe(true);
 
   const fileImported = {
     ...pasted,
