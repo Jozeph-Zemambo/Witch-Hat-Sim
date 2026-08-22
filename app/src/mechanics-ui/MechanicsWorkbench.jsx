@@ -190,7 +190,7 @@ export default function MechanicsWorkbench({ onReturnToAtelier, editBlueprintId 
       <header className="mechanics-topbar">
         <div className="mechanics-title-block">
           <nav aria-label="Mechanics navigation">
-            <a href="/">Simulator</a>
+            <a href={import.meta.env.BASE_URL}>Simulator</a>
           </nav>
           <div>
             <h1>Mechanics Workbench</h1>

@@ -56,18 +56,15 @@ npm run build
 npm run dev -- --port 5173 --strictPort
 ```
 
-## Cloudflare deployment
+## GitHub Pages deployment
 
-The repository includes an assets-only Worker configuration with SPA fallback, so direct links such as `/mechanics` resolve through the application. The workspace layout lets a fresh checkout install every dependency with one `npm ci`.
+GitHub Actions automatically builds and publishes the browser simulator after changes reach `main`. The production site is available at [jozeph-zemambo.github.io/Witch-Hat-Sim](https://jozeph-zemambo.github.io/Witch-Hat-Sim/).
+
+The Pages build uses `/Witch-Hat-Sim/` as its asset and application base path while local development continues to use `/`. It also publishes `index.html` as the custom `404.html`, allowing direct links such as `/Witch-Hat-Sim/mechanics` to load the single-page application correctly. No runtime environment variables are required.
 
 ```bash
-npx wrangler login
-npm run deploy:cloudflare
+npm run build:pages
 ```
-
-`deploy:cloudflare` creates a fresh Vite production build before uploading `app/dist`. No runtime environment variables are required.
-
-For automatic deployments, connect the GitHub repository to the existing Worker with **Workers Builds**. Use `main` as the production branch, `npm run build:app` as the build command, and `npx wrangler@4.125.0 deploy` as the deploy command. Cloudflare then builds every pushed commit and creates preview versions for non-production branches.
 
 **Pipeline:** `compileSpell(input)` runs import → registry → geometry → rules → effect graph.
 
