@@ -140,24 +140,37 @@ function waterSourceStatePatch(materialState) {
   };
 }
 
+const APP_BASE_PATH = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+function withAppBasePath(path) {
+  if (!APP_BASE_PATH) return path;
+  return `${APP_BASE_PATH}${path === '/' ? '/' : path}`;
+}
+
+function appRouteSnapshot() {
+  let pathname = window.location.pathname;
+  if (APP_BASE_PATH && (pathname === APP_BASE_PATH || pathname.startsWith(`${APP_BASE_PATH}/`))) {
+    pathname = pathname.slice(APP_BASE_PATH.length) || '/';
+  }
+  return {
+    pathname: pathname.replace(/\/$/, '') || '/',
+    search: window.location.search,
+  };
+}
+
 function navigateApp(path, { replace = false } = {}) {
   if (typeof window === 'undefined') return;
+  const target = withAppBasePath(path);
   const current = `${window.location.pathname}${window.location.search}`;
-  if (current === path) return;
-  window.history[replace ? 'replaceState' : 'pushState']({}, '', path);
+  if (current === target) return;
+  window.history[replace ? 'replaceState' : 'pushState']({}, '', target);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 function useAppRoute() {
-  const [route, setRoute] = useState(() => ({
-    pathname: window.location.pathname.replace(/\/$/, '') || '/',
-    search: window.location.search,
-  }));
+  const [route, setRoute] = useState(appRouteSnapshot);
   useEffect(() => {
-    const handlePopState = () => setRoute({
-      pathname: window.location.pathname.replace(/\/$/, '') || '/',
-      search: window.location.search,
-    });
+    const handlePopState = () => setRoute(appRouteSnapshot());
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);

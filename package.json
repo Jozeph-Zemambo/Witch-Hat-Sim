@@ -20,9 +20,9 @@
     "compile": "node bin/compile.js",
     "convert:spell-maker": "node bin/convert-spellmaker.js",
     "build:app": "npm run build --workspace=wha-simulator-app",
+    "build:pages": "npm run build --workspace=wha-simulator-app -- --base=/Witch-Hat-Sim/ && node -e \"require('node:fs').copyFileSync('app/dist/index.html', 'app/dist/404.html')\"",
     "test:app:mechanics": "npm run test:mechanics --workspace=wha-simulator-app",
-    "test:app:e2e": "npm test --workspace=wha-simulator-app",
-    "deploy:cloudflare": "npm run build:app && npx wrangler@4.125.0 deploy"
+    "test:app:e2e": "npm test --workspace=wha-simulator-app"
   },
   "engines": {
     "node": ">=20"
